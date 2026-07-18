@@ -75,7 +75,8 @@ async function launch(opts) {
 
   // detached + unref: Minecraft keeps running as its own independent process
   // even if the launcher closes or restarts itself for an update.
-  const proc = spawn('java', args, { cwd: gameDir, detached: true });
+  // windowsHide: suppresses the console window Java otherwise briefly flashes on Windows.
+  const proc = spawn('java', args, { cwd: gameDir, detached: true, windowsHide: true });
   proc.unref();
 
   proc.stdout.on('data', (d) => onStatus(d.toString()));

@@ -72,19 +72,27 @@ async function ensureClientInstalled(versionId, instanceDir, onStatus, signal) {
     classpath.push(dest);
   });
 
-  onStatus?.('Downloading assets (first launch only, can take a while)…');
   const assetsDir = path.join(instanceDir, 'assets');
   const indexPath = path.join(assetsDir, 'indexes', `${meta.assetIndex.id}.json`);
-  await downloadFile(meta.assetIndex.url, indexPath, signal);
-  const assetIndexJson = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
+  const doneMarker = path.join(assetsDir, 'indexes', `${meta.assetIndex.id}.done`);
 
-  const objectEntries = Object.values(assetIndexJson.objects);
-  const objectsDir = path.join(assetsDir, 'objects');
-  await withConcurrency(objectEntries, 16, async (obj) => {
-    const sub = obj.hash.slice(0, 2);
-    const dest = path.join(objectsDir, sub, obj.hash);
-    await downloadFile(`https://resources.download.minecraft.net/${sub}/${obj.hash}`, dest, signal);
-  });
+  if (fs.existsSync(doneMarker)) {
+    onStatus?.('Assets already up to date.');
+  } else {
+    onStatus?.('Downloading assets (first launch for this version only, can take a while)…');
+    await downloadFile(meta.assetIndex.url, indexPath, signal);
+    const assetIndexJson = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
+
+    const objectEntries = Object.values(assetIndexJson.objects);
+    const objectsDir = path.join(assetsDir, 'objects');
+    await withConcurrency(objectEntries, 16, async (obj) => {
+      const sub = obj.hash.slice(0, 2);
+      const dest = path.join(objectsDir, sub, obj.hash);
+      await downloadFile(`https://resources.download.minecraft.net/${sub}/${obj.hash}`, dest, signal);
+    });
+
+    fs.writeFileSync(doneMarker, new Date().toISOString());
+  }
 
   return {
     meta,

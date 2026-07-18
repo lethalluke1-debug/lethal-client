@@ -299,6 +299,7 @@ async function browserLogin(clientId, openUrl) {
     }
 
     const account = await finishLoginWithMicrosoftToken(tokenData.access_token);
+    account.refreshToken = tokenData.refresh_token;
 
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(buildConfirmationPage({ username: account.username }));
@@ -367,4 +368,30 @@ async function deviceCodeLogin(clientId, onUserCode) {
   return finishLoginWithMicrosoftToken(msToken.access_token);
 }
 
-module.exports = { browserLogin, deviceCodeLogin };
+/**
+ * Uses a saved refresh token to silently sign back in on app startup — no
+ * browser window, no user interaction. Throws if the refresh token is
+ * expired/revoked, which just means the user needs to sign in normally again.
+ */
+async function refreshLogin(clientId, refreshToken) {
+  const tokenRes = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formBody({
+      client_id: clientId,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      scope: 'XboxLive.signin offline_access',
+    }),
+  });
+  const tokenData = await tokenRes.json();
+  if (tokenData.error) {
+    throw new Error(tokenData.error_description || tokenData.error);
+  }
+
+  const account = await finishLoginWithMicrosoftToken(tokenData.access_token);
+  account.refreshToken = tokenData.refresh_token || refreshToken; // MS sometimes rotates it
+  return account;
+}
+
+module.exports = { browserLogin, deviceCodeLogin, refreshLogin };

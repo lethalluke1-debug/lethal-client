@@ -371,6 +371,7 @@
   .modechoice{ display:flex; flex-direction:column; gap:8px; margin-bottom:18px; }
 
   .versionpicker{ position:relative; margin-bottom:16px; }
+  .versionpicker.locked, .modechoice.locked{ pointer-events:none; opacity:.45; }
   .selectlist{
     position:absolute; top:calc(100% + 4px); left:0; right:0;
     background:var(--panel); border:1px solid var(--line); border-radius:8px;
@@ -1018,7 +1019,7 @@
   const totalCountEl = document.getElementById('totalCount');
   let activeCat = 'all';
   let searchTerm = '';
-  let currentVersion = '26.2';
+  let currentVersion = localStorage.getItem('lethal-last-version') || '26.2';
 
   function initials(name){
     return name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
@@ -1405,6 +1406,20 @@
   const versionList = document.getElementById('versionList');
   const versionLabel = document.getElementById('versionLabel');
 
+  // Reflect the restored version (from localStorage) in the picker UI —
+  // the markup defaults to 26.2, so this corrects it if you last played something else.
+  (function syncVersionPickerToSaved(){
+    const items = [...versionList.querySelectorAll('.selectitem')];
+    const match = items.find(i => i.getAttribute('data-version') === currentVersion);
+    if(match){
+      items.forEach(i=>i.classList.remove('active'));
+      match.classList.add('active');
+      versionLabel.textContent = currentVersion;
+    } else {
+      currentVersion = '26.2'; // saved version no longer exists in the list — fall back safely
+    }
+  })();
+
   versionSelect.addEventListener('click', (e)=>{
     e.stopPropagation();
     versionList.classList.toggle('open');
@@ -1417,6 +1432,7 @@
     document.querySelectorAll('.selectitem').forEach(i=>i.classList.remove('active'));
     item.classList.add('active');
     versionList.classList.remove('open');
+    localStorage.setItem('lethal-last-version', currentVersion);
     syncModsFromManifest(); // each version has its own mods folder — reload real state for it
   });
   document.addEventListener('click', ()=> versionList.classList.remove('open'));
@@ -1492,6 +1508,8 @@
     barwrap.classList.add('show');
     progressPct = 0;
     barfill.style.width = '0%';
+    document.getElementById('versionPicker').classList.add('locked');
+    document.getElementById('modeChoice').classList.add('locked');
 
     const activeMods = compatibleInstalledMods();
     const withMods = playMode === 'mods' && activeMods.length > 0;
@@ -1507,6 +1525,9 @@
     }catch(err){
       status.textContent = 'Error: ' + err.message;
     }
+
+    document.getElementById('versionPicker').classList.remove('locked');
+    document.getElementById('modeChoice').classList.remove('locked');
 
     setTimeout(()=>{
       playbtn.classList.remove('launching');
@@ -1668,11 +1689,17 @@
     accountChip.classList.remove('signing-in');
   });
 
-  // Restore a previous session if main.js still has one in memory
+  // Restore a previous session if main.js already has one in memory
   (async ()=>{
     const account = await window.api.getAccount();
     if(account) updateAccountDisplay(account);
   })();
+
+  // Silent sign-in (using a saved refresh token) finishes a moment after
+  // the page loads, not instantly — this catches it whenever it completes.
+  window.api.onAccountRestored((account)=>{
+    updateAccountDisplay(account);
+  });
 </script>
 
 

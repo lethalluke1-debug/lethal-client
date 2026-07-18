@@ -14,9 +14,29 @@ const CACHE_DIR = path.join(app.getPath('userData'), 'cache');
 // Each Minecraft version gets its own folder for mods/saves/options, so
 // switching versions never mixes incompatible mod jars together.
 const INSTANCES_ROOT = path.join(app.getPath('userData'), 'instances');
+// Just the refresh token — never the short-lived access tokens — so sign-in
+// survives closing and reopening the app, without ever storing a password.
+const SESSION_PATH = path.join(app.getPath('userData'), 'session.json');
 
 function loadConfig() {
   return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+}
+
+function loadSession() {
+  if (!fs.existsSync(SESSION_PATH)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(SESSION_PATH, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(refreshToken) {
+  fs.writeFileSync(SESSION_PATH, JSON.stringify({ refreshToken }, null, 2));
+}
+
+function clearSession() {
+  if (fs.existsSync(SESSION_PATH)) fs.unlinkSync(SESSION_PATH);
 }
 
 function gameDirFor(version) {
@@ -92,7 +112,31 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+
+  attemptSilentRestore();
 });
+
+// Tries to sign back in automatically using a saved refresh token, with no
+// browser window and no user interaction. Silently does nothing if there's
+// no saved session or it's expired — the user just sees the normal
+// "Sign in with Microsoft" state, same as a first-time user would.
+async function attemptSilentRestore() {
+  const session = loadSession();
+  if (!session?.refreshToken) return;
+
+  try {
+    const config = loadConfig();
+    if (!config.msClientId || config.msClientId.startsWith('PUT-YOUR')) return;
+
+    const result = await msauth.refreshLogin(config.msClientId, session.refreshToken);
+    account = result;
+    saveSession(result.refreshToken);
+    mainWindow?.webContents.send('account-restored', { username: result.username, uuid: result.uuid });
+  } catch (err) {
+    console.error('Silent session restore failed (user will need to sign in again):', err.message);
+    clearSession();
+  }
+}
 
 // ---------- Auto-updates ----------
 // Checks the GitHub repo configured in package.json's "build.publish" section.
@@ -173,6 +217,7 @@ ipcMain.handle('ms-login', async () => {
   });
 
   account = result;
+  if (result.refreshToken) saveSession(result.refreshToken);
   return { username: result.username, uuid: result.uuid };
 });
 
