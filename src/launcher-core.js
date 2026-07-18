@@ -5,6 +5,7 @@ const { spawn } = require('child_process');
 const mojang = require('./mojang');
 const fabric = require('./fabric');
 const modrinth = require('./modrinth');
+const { withConcurrency } = require('./download');
 
 /**
  * @param {object} opts
@@ -36,9 +37,11 @@ async function launch(opts) {
   fs.mkdirSync(modsDir, { recursive: true });
 
   if (withMods && modIds.length) {
-    for (const modId of modIds) {
-      await modrinth.downloadMod(modId, version, modsDir, onStatus, new Set(), [], signal);
-    }
+    onStatus(`Installing ${modIds.length} mod${modIds.length === 1 ? '' : 's'}…`);
+    const sharedVisited = new Set(); // a dependency like Fabric API only gets resolved once, not once per mod
+    await withConcurrency(modIds, 4, (modId) =>
+      modrinth.downloadMod(modId, version, modsDir, onStatus, sharedVisited, [], signal)
+    );
   }
 
   if (signal?.aborted) {

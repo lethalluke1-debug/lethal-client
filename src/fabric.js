@@ -4,8 +4,8 @@ const { downloadFile } = require('./download');
 
 const FABRIC_META = 'https://meta.fabricmc.net/v2/versions/loader';
 
-async function getLatestFabricLoaderVersion(gameVersion) {
-  const res = await fetch(`${FABRIC_META}/${gameVersion}`);
+async function getLatestFabricLoaderVersion(gameVersion, signal) {
+  const res = await fetch(`${FABRIC_META}/${gameVersion}`, { signal });
   if (!res.ok) throw new Error(`Could not reach Fabric's meta API (HTTP ${res.status}).`);
   const list = await res.json();
   if (!list.length) {
@@ -14,8 +14,8 @@ async function getLatestFabricLoaderVersion(gameVersion) {
   return list[0].loader.version; // Fabric Meta returns newest first
 }
 
-async function getFabricProfile(gameVersion, loaderVersion) {
-  const res = await fetch(`${FABRIC_META}/${gameVersion}/${loaderVersion}/profile/json`);
+async function getFabricProfile(gameVersion, loaderVersion, signal) {
+  const res = await fetch(`${FABRIC_META}/${gameVersion}/${loaderVersion}/profile/json`, { signal });
   if (!res.ok) throw new Error(`Could not fetch the Fabric profile (HTTP ${res.status}).`);
   return res.json();
 }
@@ -27,10 +27,10 @@ async function getFabricProfile(gameVersion, loaderVersion) {
  */
 async function ensureFabricInstalled(gameVersion, instanceDir, onStatus, signal) {
   onStatus?.('Checking Fabric loader version…');
-  const loaderVersion = await getLatestFabricLoaderVersion(gameVersion);
+  const loaderVersion = await getLatestFabricLoaderVersion(gameVersion, signal);
 
   onStatus?.(`Installing Fabric ${loaderVersion}…`);
-  const profile = await getFabricProfile(gameVersion, loaderVersion);
+  const profile = await getFabricProfile(gameVersion, loaderVersion, signal);
 
   const libsDir = path.join(instanceDir, 'libraries');
   const classpath = [];

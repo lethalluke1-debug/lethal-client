@@ -4,14 +4,14 @@ const { downloadFile, withConcurrency } = require('./download');
 
 const MANIFEST_URL = 'https://launchermeta.mojang.com/mc/game/version_manifest_v2.json';
 
-async function getVersionManifest() {
-  const res = await fetch(MANIFEST_URL);
+async function getVersionManifest(signal) {
+  const res = await fetch(MANIFEST_URL, { signal });
   if (!res.ok) throw new Error(`Could not reach Mojang's version manifest (HTTP ${res.status}).`);
   return res.json();
 }
 
-async function getVersionMeta(versionId) {
-  const manifest = await getVersionManifest();
+async function getVersionMeta(versionId, signal) {
+  const manifest = await getVersionManifest(signal);
   const entry = manifest.versions.find((v) => v.id === versionId);
   if (!entry) {
     throw new Error(
@@ -20,7 +20,7 @@ async function getVersionMeta(versionId) {
       `but double check against the manifest if this keeps failing.`
     );
   }
-  const res = await fetch(entry.url);
+  const res = await fetch(entry.url, { signal });
   return res.json();
 }
 
@@ -51,7 +51,7 @@ function librariesForCurrentOS(libraries) {
  */
 async function ensureClientInstalled(versionId, instanceDir, onStatus, signal) {
   onStatus?.(`Reading version info for ${versionId}…`);
-  const meta = await getVersionMeta(versionId);
+  const meta = await getVersionMeta(versionId, signal);
 
   const versionDir = path.join(instanceDir, 'versions', versionId);
   fs.mkdirSync(versionDir, { recursive: true });
