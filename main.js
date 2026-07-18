@@ -254,20 +254,37 @@ ipcMain.handle('upload-skin', async (event, { base64Data, variant }) => {
 });
 
 // ---------- Launch ----------
+let currentLaunchController = null;
+
 ipcMain.handle('launch-game', async (event, { version, withMods, modIds }) => {
   const config = loadConfig();
   if (!account) throw new Error('Sign in with Microsoft first.');
 
-  await launcherCore.launch({
-    version,
-    withMods,
-    modIds,
-    ramGB: config.ramGB || 4,
-    account,
-    cacheDir: CACHE_DIR,
-    gameDir: gameDirFor(version),
-    onStatus: sendStatus,
-  });
+  currentLaunchController = new AbortController();
 
-  return true;
+  try {
+    await launcherCore.launch({
+      version,
+      withMods,
+      modIds,
+      ramGB: config.ramGB || 4,
+      account,
+      cacheDir: CACHE_DIR,
+      gameDir: gameDirFor(version),
+      onStatus: sendStatus,
+      signal: currentLaunchController.signal,
+    });
+    return true;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      return { cancelled: true };
+    }
+    throw err;
+  } finally {
+    currentLaunchController = null;
+  }
+});
+
+ipcMain.on('cancel-launch', () => {
+  currentLaunchController?.abort();
 });

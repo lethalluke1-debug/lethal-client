@@ -8,12 +8,12 @@ const { pipeline } = require('stream/promises');
  * already exists, since Minecraft/Fabric/mod files are content-addressed
  * or versioned and don't need to be re-fetched once you have them.
  */
-async function downloadFile(url, destPath) {
+async function downloadFile(url, destPath, signal) {
   if (fs.existsSync(destPath)) return destPath;
 
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
 
-  const res = await fetch(url);
+  const res = await fetch(url, { signal });
   if (!res.ok) {
     throw new Error(`Failed to download ${url} — HTTP ${res.status}`);
   }

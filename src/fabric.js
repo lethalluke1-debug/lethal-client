@@ -25,7 +25,7 @@ async function getFabricProfile(gameVersion, loaderVersion) {
  * version, and returns the mainClass + classpath entries needed to
  * actually launch Fabric instead of vanilla.
  */
-async function ensureFabricInstalled(gameVersion, instanceDir, onStatus) {
+async function ensureFabricInstalled(gameVersion, instanceDir, onStatus, signal) {
   onStatus?.('Checking Fabric loader version…');
   const loaderVersion = await getLatestFabricLoaderVersion(gameVersion);
 
@@ -41,7 +41,7 @@ async function ensureFabricInstalled(gameVersion, instanceDir, onStatus) {
     const baseUrl = lib.url || 'https://maven.fabricmc.net/';
     const url = `${baseUrl}${relPath}`;
     const dest = path.join(libsDir, relPath);
-    await downloadFile(url, dest);
+    await downloadFile(url, dest, signal);
     classpath.push(dest);
   }
 

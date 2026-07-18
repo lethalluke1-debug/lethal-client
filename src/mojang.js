@@ -49,7 +49,7 @@ function librariesForCurrentOS(libraries) {
  * disk for the given version. Returns everything launcher-core.js needs
  * to build a classpath and launch args.
  */
-async function ensureClientInstalled(versionId, instanceDir, onStatus) {
+async function ensureClientInstalled(versionId, instanceDir, onStatus, signal) {
   onStatus?.(`Reading version info for ${versionId}…`);
   const meta = await getVersionMeta(versionId);
 
@@ -58,7 +58,7 @@ async function ensureClientInstalled(versionId, instanceDir, onStatus) {
   const jarPath = path.join(versionDir, `${versionId}.jar`);
 
   onStatus?.('Downloading client jar…');
-  await downloadFile(meta.downloads.client.url, jarPath);
+  await downloadFile(meta.downloads.client.url, jarPath, signal);
 
   onStatus?.('Downloading libraries…');
   const libsDir = path.join(instanceDir, 'libraries');
@@ -68,14 +68,14 @@ async function ensureClientInstalled(versionId, instanceDir, onStatus) {
   await withConcurrency(applicableLibs, 8, async (lib) => {
     const artifact = lib.downloads.artifact;
     const dest = path.join(libsDir, artifact.path);
-    await downloadFile(artifact.url, dest);
+    await downloadFile(artifact.url, dest, signal);
     classpath.push(dest);
   });
 
   onStatus?.('Downloading assets (first launch only, can take a while)…');
   const assetsDir = path.join(instanceDir, 'assets');
   const indexPath = path.join(assetsDir, 'indexes', `${meta.assetIndex.id}.json`);
-  await downloadFile(meta.assetIndex.url, indexPath);
+  await downloadFile(meta.assetIndex.url, indexPath, signal);
   const assetIndexJson = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
 
   const objectEntries = Object.values(assetIndexJson.objects);
@@ -83,7 +83,7 @@ async function ensureClientInstalled(versionId, instanceDir, onStatus) {
   await withConcurrency(objectEntries, 16, async (obj) => {
     const sub = obj.hash.slice(0, 2);
     const dest = path.join(objectsDir, sub, obj.hash);
-    await downloadFile(`https://resources.download.minecraft.net/${sub}/${obj.hash}`, dest);
+    await downloadFile(`https://resources.download.minecraft.net/${sub}/${obj.hash}`, dest, signal);
   });
 
   return {

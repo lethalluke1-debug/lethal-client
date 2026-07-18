@@ -17,9 +17,10 @@ const modrinth = require('./modrinth');
  * @param {string} opts.gameDir - THIS version's own folder for mods/saves/options — never shared
  *   with other versions, so switching versions can't mix incompatible mod jars together
  * @param {(msg:string)=>void} opts.onStatus - called with human-readable progress lines
+ * @param {AbortSignal} [opts.signal] - lets the whole download/install process be cancelled
  */
 async function launch(opts) {
-  const { version, withMods, modIds, ramGB, account, cacheDir, gameDir, onStatus } = opts;
+  const { version, withMods, modIds, ramGB, account, cacheDir, gameDir, onStatus, signal } = opts;
 
   if (!account?.minecraftAccessToken) {
     throw new Error('You need to sign in with Microsoft before you can launch.');
@@ -28,16 +29,22 @@ async function launch(opts) {
   fs.mkdirSync(cacheDir, { recursive: true });
   fs.mkdirSync(gameDir, { recursive: true });
 
-  const vanilla = await mojang.ensureClientInstalled(version, cacheDir, onStatus);
-  const fab = await fabric.ensureFabricInstalled(version, cacheDir, onStatus);
+  const vanilla = await mojang.ensureClientInstalled(version, cacheDir, onStatus, signal);
+  const fab = await fabric.ensureFabricInstalled(version, cacheDir, onStatus, signal);
 
   const modsDir = path.join(gameDir, 'mods');
   fs.mkdirSync(modsDir, { recursive: true });
 
   if (withMods && modIds.length) {
     for (const modId of modIds) {
-      await modrinth.downloadMod(modId, version, modsDir, onStatus);
+      await modrinth.downloadMod(modId, version, modsDir, onStatus, new Set(), [], signal);
     }
+  }
+
+  if (signal?.aborted) {
+    const err = new Error('Launch cancelled.');
+    err.name = 'AbortError';
+    throw err;
   }
 
   onStatus(`Starting Fabric ${version} + JVM…`);

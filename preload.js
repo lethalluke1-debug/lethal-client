@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('api', {
 
   launchGame: (version, withMods, modIds) =>
     ipcRenderer.invoke('launch-game', { version, withMods, modIds }),
+  cancelLaunch: () => ipcRenderer.send('cancel-launch'),
 
   onStatus: (callback) => ipcRenderer.on('status-update', (event, msg) => callback(msg)),
   onLoginWaiting: (callback) => ipcRenderer.on('ms-login-waiting', () => callback()),

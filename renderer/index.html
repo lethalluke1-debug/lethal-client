@@ -998,7 +998,6 @@
     { id:'jade', name:'Jade', cat:'utility', color:'#d9b23c', size:'0.9 MB', author:'Snownee', desc:'Shows an info tooltip for whatever block or entity you look at.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
     { id:'litematica', name:'Litematica', cat:'utility', color:'#7c5cb3', size:'1.8 MB', author:'masa', desc:'Loads and overlays schematics for building, needs MaLiLib.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
     { id:'map-tooltip', name:'Map Tooltip', cat:'utility', color:'#4f8fd6', size:'0.1 MB', author:'VendoAU', desc:'Shows a small map preview when hovering over map items.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
-    { id:'mouse-tweaks', name:'Mouse Tweaks', cat:'utility', color:'#8b9299', size:'0.1 MB', author:'YaLTeR', desc:'Adds click-and-drag and right-click-drag inventory shortcuts.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
     { id:'shulkerboxtooltip', name:'Shulker Box Tooltip', cat:'utility', color:'#7c5cb3', size:'0.4 MB', author:'MisterPeModder', desc:"Shows a shulker box's contents when you hover over it.", installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
     { id:'svc', name:'Simple Voice Chat', cat:'utility', color:'#d95a5a', size:'5.3 MB', author:'henkelmax', desc:'In-game proximity voice chat, no Discord required.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10'] },
     { id:'flashback', name:'Flashback', cat:'utility', color:'#8b9299', size:'201.7 MB', author:'Moulberry', desc:'Records and replays gameplay footage from any angle.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
@@ -1047,28 +1046,25 @@
         (m.name.toLowerCase().includes(searchTerm) || m.desc.toLowerCase().includes(searchTerm))
       );
     } else {
-      // Normal category tabs only ever show mods that actually work on
-      // whatever version is currently selected.
+      // Normal category tabs show every mod matching the category/search —
+      // real availability for the selected version gets checked for real
+      // the moment you click Install, instead of being guessed here.
       filtered = modsCatalog.filter(m=>{
         const matchesCat = activeCat === 'all' || m.cat === activeCat;
         const matchesSearch = m.name.toLowerCase().includes(searchTerm) || m.desc.toLowerCase().includes(searchTerm);
-        const compatible = m.versions.includes(currentVersion);
-        return matchesCat && matchesSearch && compatible;
+        return matchesCat && matchesSearch;
       });
     }
 
     modListEl.innerHTML = '';
     filtered.forEach(mod=>{
-      const compatible = mod.versions.includes(currentVersion);
       const row = document.createElement('div');
-      row.className = 'modcard2' + (compatible ? '' : ' incompatible');
+      row.className = 'modcard2';
 
-      const actionHtml = compatible
-        ? `<button class="installbtn ${mod.installed ? 'installed' : ''}" data-id="${mod.id}">
+      const actionHtml = `<button class="installbtn ${mod.installed ? 'installed' : ''}" data-id="${mod.id}">
              <div class="ibar"></div>
              <span class="ibtxt">${mod.installed ? 'Installed' : 'Install'}</span>
-           </button>`
-        : `<div class="incompat-note">Not compatible<br>with ${currentVersion}</div>`;
+           </button>`;
 
       row.innerHTML = `
         <div class="modicon" style="background:${mod.color}">${initials(mod.name)}</div>
@@ -1078,7 +1074,7 @@
             <span class="cat">${mod.cat}</span>
           </div>
           <p>${mod.desc}</p>
-          <div class="subline">by ${mod.author} · ${mod.size} · works on ${mod.versions.join(', ')}</div>
+          <div class="subline">by ${mod.author} · ${mod.size}</div>
         </div>
         ${actionHtml}
       `;
@@ -1429,7 +1425,11 @@
   let playMode = 'mods'; // 'nomods' | 'mods'
 
   function compatibleInstalledMods(){
-    return modsCatalog.filter(m=> m.installed && m.versions.includes(currentVersion));
+    // m.installed already only reflects what's really installed for the
+    // CURRENT version (each version has its own mods folder/manifest), so
+    // there's no need to re-check our own guessed .versions list on top —
+    // that was blocking real dependencies like Fabric API for no good reason.
+    return modsCatalog.filter(m=> m.installed);
   }
 
   function updateModsSubline(){
@@ -1474,7 +1474,12 @@
   });
 
   playbtn.addEventListener('click', async ()=>{
-    if(playbtn.classList.contains('launching')) return;
+    if(playbtn.classList.contains('launching')){
+      // Already launching — this click means Cancel, not Play again.
+      window.api.cancelLaunch();
+      status.textContent = 'Cancelling…';
+      return;
+    }
 
     const account = await window.api.getAccount();
     if(!account){
@@ -1483,7 +1488,7 @@
     }
 
     playbtn.classList.add('launching');
-    playlabel.textContent = 'LAUNCHING…';
+    playlabel.textContent = 'CANCEL';
     barwrap.classList.add('show');
     progressPct = 0;
     barfill.style.width = '0%';
@@ -1492,9 +1497,13 @@
     const withMods = playMode === 'mods' && activeMods.length > 0;
 
     try{
-      await window.api.launchGame(currentVersion, withMods, activeMods.map(m=>m.id));
-      barfill.style.width = '100%';
-      status.textContent = 'Launched — have fun!';
+      const result = await window.api.launchGame(currentVersion, withMods, activeMods.map(m=>m.id));
+      if(result && result.cancelled){
+        status.textContent = 'Launch cancelled.';
+      } else {
+        barfill.style.width = '100%';
+        status.textContent = 'Launched — have fun!';
+      }
     }catch(err){
       status.textContent = 'Error: ' + err.message;
     }
@@ -1504,7 +1513,7 @@
       playlabel.textContent = 'PLAY';
       barwrap.classList.remove('show');
       barfill.style.width = '0%';
-      if(!status.textContent.startsWith('Error')) status.textContent = 'Ready to launch';
+      if(!status.textContent.startsWith('Error') && status.textContent !== 'Launch cancelled.') status.textContent = 'Ready to launch';
     }, 1800);
   });
 

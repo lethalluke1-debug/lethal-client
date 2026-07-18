@@ -20,7 +20,7 @@ const CURATED_MODS = {
   entityculling: 'entityculling',
   'low-fire': 'low-fire',
   'marlows-crystal-optimizer': 'marlow-crystal-optimizer',
-  'heros-anchor-optimizer': 'heros-anchor-optimizer',
+  'heros-anchor-optimizer': 'anchor',
   'fabric-api': 'fabric-api',
   'fabric-language-kotlin': 'fabric-language-kotlin',
   'cloth-config': 'cloth-config',
@@ -32,7 +32,6 @@ const CURATED_MODS = {
   jade: 'jade',
   litematica: 'litematica',
   'map-tooltip': 'maptooltip',
-  'mouse-tweaks': 'mouse-tweaks',
   shulkerboxtooltip: 'shulkerboxtooltip',
   svc: 'simple-voice-chat',
   flashback: 'flashback',
@@ -72,7 +71,7 @@ async function resolveProjectSlug(projectId) {
  * `visited` prevents re-downloading the same dependency twice in one pass,
  * or looping forever if two mods depend on each other.
  */
-async function downloadMod(modId, gameVersion, modsDir, onStatus, visited = new Set(), dependencyResults = []) {
+async function downloadMod(modId, gameVersion, modsDir, onStatus, visited = new Set(), dependencyResults = [], signal) {
   const slug = CURATED_MODS[modId] || modId;
   if (visited.has(slug)) return null; // already handled earlier in this same install pass
   visited.add(slug);
@@ -84,7 +83,7 @@ async function downloadMod(modId, gameVersion, modsDir, onStatus, visited = new 
   onStatus?.(`Downloading ${file.filename}…`);
   fs.mkdirSync(modsDir, { recursive: true });
   const dest = path.join(modsDir, file.filename);
-  await downloadFile(file.url, dest);
+  await downloadFile(file.url, dest, signal);
 
   const isTopLevelCall = dependencyResults.length === 0 && visited.size === 1;
   const result = { filename: file.filename, versionNumber: version.version_number };
@@ -98,7 +97,7 @@ async function downloadMod(modId, gameVersion, modsDir, onStatus, visited = new 
     try {
       const depSlug = await resolveProjectSlug(dep.project_id);
       onStatus?.(`${slug} needs ${depSlug} — installing that too…`);
-      const depResult = await downloadMod(depSlug, gameVersion, modsDir, onStatus, visited, dependencyResults);
+      const depResult = await downloadMod(depSlug, gameVersion, modsDir, onStatus, visited, dependencyResults, signal);
       if (depResult) dependencyResults.push({ modId: depSlug, ...depResult });
     } catch (err) {
       onStatus?.(`Couldn't auto-install a dependency for ${slug}: ${err.message}`);
