@@ -34,7 +34,7 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "your-github-username",
+      "owner": "lethalluke1-debug",
       "repo": "lethal-client"
     },
     "win": {
