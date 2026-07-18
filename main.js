@@ -123,7 +123,9 @@ autoUpdater.on('error', (err) => {
 // closes the launcher (never Minecraft, which runs as its own detached
 // process) and reopens it already updated.
 ipcMain.on('restart-to-update', () => {
-  autoUpdater.quitAndInstall();
+  // isSilent=true, isForceRunAfter=true: no installer wizard, just swaps
+  // itself out and relaunches automatically.
+  autoUpdater.quitAndInstall(true, true);
 });
 
 // Lets the user (or us, for debugging) trigger a check on demand instead of

@@ -1,6 +1,6 @@
 {
   "name": "lethal-client",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "A real Fabric-based Minecraft launcher: Microsoft login, Modrinth mod downloads, Fabric install, and game launch.",
   "author": "Lethal Client",
   "main": "main.js",
