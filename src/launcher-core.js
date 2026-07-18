@@ -75,8 +75,11 @@ async function launch(opts) {
 
   // detached + unref: Minecraft keeps running as its own independent process
   // even if the launcher closes or restarts itself for an update.
-  // windowsHide: suppresses the console window Java otherwise briefly flashes on Windows.
-  const proc = spawn('java', args, { cwd: gameDir, detached: true, windowsHide: true });
+  // On Windows, java.exe always attaches its own console window no matter
+  // what spawn options you pass — javaw.exe is the same JVM built as a
+  // windowed app with no console at all, which is what actually fixes it.
+  const javaBinary = process.platform === 'win32' ? 'javaw' : 'java';
+  const proc = spawn(javaBinary, args, { cwd: gameDir, detached: true, windowsHide: true });
   proc.unref();
 
   proc.stdout.on('data', (d) => onStatus(d.toString()));
