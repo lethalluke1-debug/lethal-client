@@ -106,9 +106,17 @@ autoUpdater.on('download-progress', (progress) => {
 });
 autoUpdater.on('update-downloaded', () => {
   mainWindow?.webContents.send('status-update', 'Update ready — restart Lethal Client to apply it.');
+  mainWindow?.webContents.send('update-ready');
 });
 autoUpdater.on('error', (err) => {
   console.error('Auto-update error:', err);
+});
+
+// The user clicks "Restart Now" in the renderer to actually apply it — this
+// closes the launcher (never Minecraft, which runs as its own detached
+// process) and reopens it already updated.
+ipcMain.on('restart-to-update', () => {
+  autoUpdater.quitAndInstall();
 });
 
 app.whenReady().then(() => {
