@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('api', {
   onLoginWaiting: (callback) => ipcRenderer.on('ms-login-waiting', () => callback()),
   onUpdateReady: (callback) => ipcRenderer.on('update-ready', () => callback()),
   restartToUpdate: () => ipcRenderer.send('restart-to-update'),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
 
   minimizeWindow: () => ipcRenderer.send('window-minimize'),
   maximizeWindow: () => ipcRenderer.send('window-maximize'),

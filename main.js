@@ -98,8 +98,14 @@ app.whenReady().then(() => {
 // Checks the GitHub repo configured in package.json's "build.publish" section.
 // Only works in a packaged build (npm start from source always says
 // "update-not-available", since dev builds have no version to compare against).
-autoUpdater.on('update-available', () => {
-  mainWindow?.webContents.send('status-update', 'A new version is available — downloading…');
+autoUpdater.on('checking-for-update', () => {
+  mainWindow?.webContents.send('status-update', `Checking for updates… (currently on v${app.getVersion()})`);
+});
+autoUpdater.on('update-available', (info) => {
+  mainWindow?.webContents.send('status-update', `Update found (v${info.version}) — downloading…`);
+});
+autoUpdater.on('update-not-available', () => {
+  mainWindow?.webContents.send('status-update', `You're on the latest version (v${app.getVersion()}).`);
 });
 autoUpdater.on('download-progress', (progress) => {
   mainWindow?.webContents.send('status-update', `Downloading update — ${Math.round(progress.percent)}%…`);
@@ -109,6 +115,7 @@ autoUpdater.on('update-downloaded', () => {
   mainWindow?.webContents.send('update-ready');
 });
 autoUpdater.on('error', (err) => {
+  mainWindow?.webContents.send('status-update', `Update check failed: ${err.message}`);
   console.error('Auto-update error:', err);
 });
 
@@ -117,6 +124,12 @@ autoUpdater.on('error', (err) => {
 // process) and reopens it already updated.
 ipcMain.on('restart-to-update', () => {
   autoUpdater.quitAndInstall();
+});
+
+// Lets the user (or us, for debugging) trigger a check on demand instead of
+// only ever checking once automatically at startup.
+ipcMain.handle('check-for-updates', async () => {
+  return autoUpdater.checkForUpdates();
 });
 
 app.whenReady().then(() => {

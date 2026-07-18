@@ -638,6 +638,10 @@
       <span class="tip">Coming soon</span>
     </div>
     <div class="spacer" style="flex:1"></div>
+    <div class="navitem" data-tip="Check for updates" id="checkUpdatesBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7"/><path d="M21 3v6h-6"/></svg>
+      <span class="tip">Check for updates</span>
+    </div>
     <div class="navitem" data-tip="Settings" data-page="other" data-title="SETTINGS">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.6 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 010-4h.09A1.65 1.65 0 003.6 8.6a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H8a1.65 1.65 0 001-1.51V2a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V8c.14.42.4.79.75 1.06.35.27.77.42 1.21.44H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       <span class="tip">Settings</span>
@@ -923,6 +927,7 @@
   document.querySelectorAll('.navitem').forEach(item=>{
     item.addEventListener('click', ()=>{
       if(item.classList.contains('disabled')) return;
+      if(!item.hasAttribute('data-page')) return; // e.g. the Check for updates button, which isn't a page
 
       document.querySelectorAll('.navitem').forEach(n=>n.classList.remove('active'));
       item.classList.add('active');
@@ -1494,6 +1499,14 @@
   document.getElementById('winClose').addEventListener('click', ()=> window.api.closeWindow());
 
   // ---------- Skins (real Mojang skin upload) ----------
+  document.getElementById('checkUpdatesBtn').addEventListener('click', async ()=>{
+    try{
+      await window.api.checkForUpdates();
+    }catch(err){
+      status.textContent = 'Update check failed: ' + err.message;
+    }
+  });
+
   window.api.onUpdateReady(()=>{
     document.getElementById('updateBanner').style.display = 'flex';
   });
