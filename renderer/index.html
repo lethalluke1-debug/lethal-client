@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lethal Client</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root{
+    --void: #0d1013;
+    --stone: #171b1f;
+    --panel: #1d2226;
+    --panel-hi: #262c31;
+    --line: #2e353b;
+    --text: #e9e6dd;
+    --muted: #8b9299;
+    --ember: #ff9d3d;
+    --ember-dim: #b3661f;
+    --moss: #5cb37d;
+    --lapis: #4f8fd6;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  html,body{
+    height:100%;
+    background:var(--void);
+    color:var(--text);
+    font-family:'Rubik', sans-serif;
+    overflow:hidden;
+  }
+
+  #app{
+    position:relative;
+    width:100%;
+    height:100vh;
+    min-height:640px;
+    display:flex;
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(255,157,61,0.06), transparent 55%),
+      radial-gradient(ellipse at 80% 100%, rgba(79,143,214,0.05), transparent 55%),
+      linear-gradient(180deg, #12161a 0%, #0d1013 100%);
+  }
+
+  /* ---------- floating particle motes (torch/portal ambience) ---------- */
+  .motes{ position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .mote{
+    position:absolute;
+    width:3px; height:3px;
+    background:var(--ember);
+    border-radius:1px;
+    opacity:0;
+    filter: drop-shadow(0 0 4px rgba(255,157,61,0.9));
+    animation: rise 7s linear infinite;
+  }
+  @keyframes rise{
+    0%{ transform:translateY(0) translateX(0); opacity:0; }
+    8%{ opacity:.9; }
+    90%{ opacity:.3; }
+    100%{ transform:translateY(-380px) translateX(var(--drift,20px)); opacity:0; }
+  }
+
+  /* ---------- sidebar ---------- */
+  #sidebar{
+    width:72px;
+    background:var(--stone);
+    border-right:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:18px 0;
+    gap:6px;
+    z-index:5;
+  }
+  .brandmark{
+    width:40px; height:40px;
+    margin-bottom:14px;
+    background:linear-gradient(135deg, var(--ember) 0%, var(--ember-dim) 100%);
+    border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Press Start 2P';
+    font-size:14px;
+    color:#1a1200;
+    box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 4px 14px rgba(255,157,61,.25);
+  }
+  .navitem{
+    width:44px; height:44px;
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--muted);
+    cursor:pointer;
+    position:relative;
+    transition: background .15s ease, color .15s ease;
+  }
+  .navitem svg{ width:20px; height:20px; }
+  .navitem:hover{ background:var(--panel-hi); color:var(--text); }
+  .navitem.active{ background:var(--panel-hi); color:var(--ember); }
+  .navitem.active::before{
+    content:'';
+    position:absolute; left:-9px; top:50%; transform:translateY(-50%);
+    width:3px; height:20px; border-radius:2px;
+    background:var(--ember);
+  }
+  .navitem.disabled{ cursor:not-allowed; opacity:.4; }
+  .navitem.disabled:hover{ background:none; color:var(--muted); }
+
+  /* ---------- skins page ---------- */
+  .skins-layout{ display:flex; gap:24px; align-items:flex-start; }
+  .skins-preview{
+    width:240px; flex-shrink:0;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:24px 16px; display:flex; flex-direction:column; align-items:center; gap:12px;
+  }
+  .skins-preview img{ width:140px; image-rendering:pixelated; }
+  .skins-preview-label{ font-size:12px; color:var(--muted); text-align:center; }
+  .skins-controls{ flex:1; min-width:0; }
+  .navitem .tip{
+    position:absolute; left:58px; top:50%; transform:translateY(-50%);
+    background:#000; border:1px solid var(--line);
+    padding:4px 9px; border-radius:6px;
+    font-size:12px; white-space:nowrap;
+    opacity:0; pointer-events:none;
+    transition:opacity .12s ease;
+    z-index:20;
+  }
+  .navitem:hover .tip{ opacity:1; }
+
+  /* ---------- main ---------- */
+  #main{ flex:1; display:flex; flex-direction:column; position:relative; z-index:2; min-width:0; }
+
+  #topbar{
+    height:58px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 22px;
+    border-bottom:1px solid var(--line);
+    -webkit-app-region: drag;
+  }
+  .titlecluster{ display:flex; align-items:center; gap:10px; }
+  .titlecluster .name{ font-family:'Press Start 2P'; font-size:11px; letter-spacing:.5px; color:var(--text); }
+  .titlecluster .ver{ font-family:'JetBrains Mono'; font-size:11px; color:var(--muted); background:var(--panel); border:1px solid var(--line); padding:2px 7px; border-radius:5px; }
+
+  .topbar-right{ display:flex; align-items:center; }
+
+  .account{
+    display:flex; align-items:center; gap:9px;
+    -webkit-app-region:no-drag;
+    cursor:pointer;
+    padding:5px 10px 5px 5px;
+    border-radius:20px;
+    transition:background .15s ease;
+  }
+  .account:hover{ background:var(--panel); }
+  .account .skinhead{
+    width:30px; height:30px; border-radius:6px;
+    border:1px solid var(--line);
+    object-fit:cover;
+    image-rendering:pixelated;
+    background:var(--panel-hi);
+  }
+  .account .uname{ font-size:13px; font-weight:500; }
+  .account .caret{ color:var(--muted); font-size:10px; }
+
+  /* ---------- content ---------- */
+  #content{ flex:1; display:flex; overflow:hidden; }
+
+  #newsfeed{
+    flex:1;
+    padding:26px 28px 20px;
+    overflow-y:auto;
+  }
+  #newsfeed::-webkit-scrollbar{ width:8px; }
+  #newsfeed::-webkit-scrollbar-thumb{ background:var(--panel-hi); border-radius:4px; }
+
+  .eyebrow{
+    font-family:'JetBrains Mono'; font-size:11px; letter-spacing:2px;
+    color:var(--ember); text-transform:uppercase; margin-bottom:8px;
+  }
+  .hero{
+    font-family:'Press Start 2P';
+    font-size:22px; line-height:1.6;
+    margin-bottom:22px;
+    text-shadow:0 2px 0 rgba(0,0,0,.5);
+  }
+
+  /* ---------- hero landing (home page) ---------- */
+  .hero-landing{
+    position:relative;
+    height:340px;
+    margin:-26px -28px 24px;
+    overflow:hidden;
+    border-bottom:1px solid var(--line);
+  }
+  .hero-bg{
+    position:absolute; inset:0;
+    background:linear-gradient(180deg, #2a2035 0%, #4a2e3a 35%, #6b3f3f 55%, #1a1414 100%);
+    overflow:hidden;
+  }
+  .hero-sun{
+    position:absolute; left:50%; top:38%; transform:translate(-50%,-50%);
+    width:140px; height:140px; border-radius:50%;
+    background:radial-gradient(circle, rgba(255,200,140,.9), rgba(255,157,61,.15) 70%, transparent 100%);
+    filter:blur(2px);
+  }
+  .hero-hill{
+    position:absolute; left:0; right:0; bottom:0;
+    height:120px;
+    clip-path: polygon(0% 60%, 8% 45%, 20% 55%, 32% 35%, 46% 50%, 58% 30%, 72% 48%, 86% 32%, 100% 46%, 100% 100%, 0% 100%);
+  }
+  .hero-hill-back{ background:#2e2438; height:150px; opacity:.8; }
+  .hero-hill-front{ background:#1c1620; height:110px; }
+
+  .hero-content{
+    position:relative; z-index:2;
+    height:100%;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+    padding-bottom:22px;
+    gap:10px;
+  }
+  .hero-character{ position:relative; display:flex; flex-direction:column; align-items:center; }
+  .hero-character img{ position:relative; z-index:2; height:190px; width:auto; image-rendering:pixelated; filter:drop-shadow(0 10px 18px rgba(0,0,0,.4)); transition:filter .2s ease; }
+  .hero-character:hover img{ filter:drop-shadow(0 10px 18px rgba(0,0,0,.4)) brightness(1.08); }
+  .hero-character:hover .hero-glow{ opacity:1; width:210px; height:210px; }
+  .hero-glow{
+    position:absolute; left:50%; top:35%; transform:translate(-50%,-50%);
+    width:180px; height:180px; border-radius:50%;
+    background:radial-gradient(circle, rgba(255,157,61,.35), transparent 70%);
+    z-index:1;
+    animation: heroGlowPulse 3s ease-in-out infinite;
+    transition:width .25s ease, height .25s ease;
+  }
+  @keyframes heroGlowPulse{
+    0%,100%{ opacity:.7; }
+    50%{ opacity:1; }
+  }
+  .hero-pedestal{
+    width:100px; height:16px; border-radius:50%;
+    background:radial-gradient(ellipse, rgba(255,157,61,.5), transparent 75%);
+    margin-top:-8px;
+    z-index:1;
+  }
+  .hero-username{
+    font-family:'Press Start 2P'; font-size:13px; color:#fff;
+    text-shadow:0 2px 6px rgba(0,0,0,.6);
+  }
+
+  .hero-actions{ display:flex; align-items:center; justify-content:center; margin-top:4px; }
+  .hero-playbtn{
+    display:flex; align-items:center; gap:8px;
+    padding:12px 26px; border:none; border-radius:10px;
+    background:linear-gradient(180deg, var(--ember) 0%, var(--ember-dim) 100%);
+    color:#1a1200; font-family:'Press Start 2P'; font-size:12px;
+    cursor:pointer;
+    box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 6px 18px rgba(255,157,61,.35);
+  }
+  .hero-playbtn svg{ width:16px; height:16px; }
+
+  .community-servers{ padding:0; }
+  .addserver-row{ display:flex; gap:8px; margin-bottom:12px; }
+  .addserver-row input{
+    flex:1; background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:9px 12px; color:var(--text); font-size:13px; font-family:'Rubik';
+  }
+  .addserver-row input::placeholder{ color:var(--muted); }
+  .addserver-row button{
+    padding:9px 18px; border-radius:8px; border:1px solid var(--ember-dim);
+    background:rgba(255,157,61,.1); color:var(--ember); font-size:13px; font-weight:500;
+    cursor:pointer;
+  }
+  .addserver-row button:hover{ background:rgba(255,157,61,.18); }
+  .serverremove{
+    flex-shrink:0; width:26px; height:26px; border-radius:6px;
+    background:transparent; border:1px solid transparent; color:var(--muted);
+    font-size:15px; cursor:pointer; margin-left:4px;
+  }
+  .serverremove:hover{ color:#d95a5a; border-color:#d95a5a; }
+  .serverlist{ display:flex; flex-direction:column; gap:10px; }
+  .serverrow{
+    display:flex; align-items:center; gap:14px;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px;
+    transition:border-color .15s ease;
+  }
+  .serverrow:hover{ border-color:#3a4147; }
+  .servericon{
+    width:44px; height:44px; border-radius:9px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Press Start 2P'; font-size:14px; color:rgba(0,0,0,.5);
+  }
+  .servermeta{ flex:1; min-width:0; }
+  .servermeta h4{ font-size:14px; margin-bottom:3px; }
+  .serversub{ font-family:'JetBrains Mono'; font-size:11px; color:var(--muted); }
+  .serverstatus{
+    flex-shrink:0; display:flex; align-items:center; gap:6px;
+    font-family:'JetBrains Mono'; font-size:11.5px; color:var(--muted);
+  }
+  .serverstatus .dot{ width:7px; height:7px; border-radius:50%; background:var(--moss); box-shadow:0 0 6px var(--moss); }
+
+  /* ---------- right rail: play panel ---------- */
+  #playrail{
+    width:340px;
+    border-left:1px solid var(--line);
+    background:var(--stone);
+    display:flex; flex-direction:column;
+    padding:22px 20px 20px;
+  }
+  .fieldlabel{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; display:block; }
+
+  .select{
+    width:100%;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    color:var(--text);
+    font-size:13px;
+    margin-bottom:16px;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:space-between;
+    transition:border-color .15s ease;
+  }
+  .select:hover{ border-color:var(--ember-dim); }
+
+  .modrow{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+  .modrow:last-child{ border-bottom:none; }
+  .modrow .modname{ display:flex; flex-direction:column; }
+  .modrow .modname small{ color:var(--muted); font-size:11px; }
+
+  .modechoice{ display:flex; flex-direction:column; gap:8px; margin-bottom:18px; }
+
+  .versionpicker{ position:relative; margin-bottom:16px; }
+  .selectlist{
+    position:absolute; top:calc(100% + 4px); left:0; right:0;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    overflow:hidden; z-index:30;
+    display:none;
+    box-shadow:0 8px 24px rgba(0,0,0,.35);
+  }
+  .selectlist.open{ display:block; }
+  .selectitem{
+    padding:9px 12px; font-size:13px; cursor:pointer;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .selectitem:hover{ background:var(--panel-hi); }
+  .selectitem.active{ color:var(--ember); }
+  .modebtn{
+    display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:10px 12px; cursor:pointer; text-align:left;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .modebtn:hover{ border-color:var(--ember-dim); }
+  .modebtn.active{ background:rgba(255,157,61,.1); border-color:var(--ember); }
+  .modebtn-title{ font-size:13px; font-weight:600; color:var(--text); }
+  .modebtn.active .modebtn-title{ color:var(--ember); }
+  .modebtn-sub{ font-family:'JetBrains Mono'; font-size:11px; color:var(--muted); }
+
+  #demoNotice{
+    margin-top:8px; text-align:center;
+    font-size:11px; color:#5f6a71; font-style:italic;
+  }
+
+  .toggle{
+    width:38px; height:22px; border-radius:11px;
+    background:var(--panel-hi);
+    border:1px solid var(--line);
+    position:relative; cursor:pointer;
+    flex-shrink:0;
+    transition:background .15s ease;
+  }
+  .toggle::after{
+    content:''; position:absolute; top:2px; left:2px;
+    width:16px; height:16px; border-radius:50%;
+    background:var(--muted);
+    transition:transform .15s ease, background .15s ease;
+  }
+  .toggle.on{ background:rgba(92,179,125,.18); border-color:var(--moss); }
+  .toggle.on::after{ transform:translateX(16px); background:var(--moss); }
+
+  .spacer{ flex:1; }
+
+  .fps{
+    display:flex; justify-content:space-between;
+    font-family:'JetBrains Mono'; font-size:11px; color:var(--muted);
+    margin-bottom:14px;
+  }
+  .fps b{ color:var(--text); }
+
+  #playbtn{
+    position:relative;
+    width:100%; height:56px;
+    border:none; border-radius:10px;
+    background:linear-gradient(180deg, var(--ember) 0%, var(--ember-dim) 100%);
+    color:#1a1200;
+    font-family:'Press Start 2P';
+    font-size:13px;
+    letter-spacing:1px;
+    cursor:pointer;
+    box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 6px 18px rgba(255,157,61,.28);
+    overflow:hidden;
+    transition:transform .08s ease, box-shadow .2s ease;
+  }
+  #playbtn:hover{ box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 8px 24px rgba(255,157,61,.42); }
+  #playbtn:active{ transform:translateY(1px); }
+  #playbtn .flicker{
+    position:absolute; inset:0;
+    background:radial-gradient(circle at 30% 50%, rgba(255,255,255,.35), transparent 60%);
+    animation: flick 2.4s ease-in-out infinite;
+    mix-blend-mode:overlay;
+  }
+  @keyframes flick{
+    0%,100%{ opacity:.5; }
+    50%{ opacity:.9; }
+  }
+  #playbtn.launching{ pointer-events:none; }
+  .barwrap{
+    position:absolute; left:0; bottom:0; height:4px; width:100%;
+    background:rgba(0,0,0,.35);
+    display:none;
+  }
+  .barwrap.show{ display:block; }
+  .barfill{ height:100%; width:0%; background:#1a1200; transition:width .25s linear; }
+
+  #status{
+    margin-top:10px; text-align:center;
+    font-family:'JetBrains Mono'; font-size:11px; color:var(--muted);
+    min-height:16px;
+  }
+
+  /* ---------- mods page ---------- */
+  .page{ display:none; flex:1; padding:26px 28px 20px; overflow-y:auto; }
+  .page.active{ display:block; }
+  .page::-webkit-scrollbar{ width:8px; }
+  .page::-webkit-scrollbar-thumb{ background:var(--panel-hi); border-radius:4px; }
+
+  .modslib-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:14px; }
+  .modslib-head .counts{ font-family:'JetBrains Mono'; font-size:12px; color:var(--muted); white-space:nowrap; }
+  .modslib-head .counts b{ color:var(--moss); }
+
+  .searchbar{
+    flex:1; max-width:340px;
+    display:flex; align-items:center; gap:8px;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:9px 12px;
+  }
+  .searchbar input{
+    flex:1; background:none; border:none; outline:none;
+    color:var(--text); font-size:13px; font-family:'Rubik';
+  }
+  .searchbar input::placeholder{ color:var(--muted); }
+  .searchbar svg{ width:15px; height:15px; color:var(--muted); flex-shrink:0; }
+
+  .tabs{ display:flex; gap:6px; margin-bottom:18px; flex-wrap:wrap; }
+  .tab{
+    padding:7px 13px; border-radius:20px; font-size:12px;
+    background:var(--panel); border:1px solid var(--line); color:var(--muted);
+    cursor:pointer; transition:all .15s ease;
+  }
+  .tab:hover{ color:var(--text); border-color:var(--ember-dim); }
+  .tab.active{ background:rgba(255,157,61,.12); border-color:var(--ember-dim); color:var(--ember); }
+
+  .modlist{ display:flex; flex-direction:column; gap:10px; }
+  .modcard2{
+    display:flex; align-items:center; gap:14px;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px;
+    transition:border-color .15s ease;
+  }
+  .modcard2:hover{ border-color:#3a4147; }
+  .modicon{
+    width:44px; height:44px; border-radius:9px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Press Start 2P'; font-size:13px; color:#0d0f0a;
+  }
+  .modmeta{ flex:1; min-width:0; }
+  .modmeta .toprow{ display:flex; align-items:center; gap:8px; margin-bottom:3px; flex-wrap:wrap; }
+  .modmeta h4{ font-size:14px; font-weight:600; }
+  .modmeta .cat{
+    font-family:'JetBrains Mono'; font-size:10px; text-transform:uppercase; letter-spacing:.5px;
+    color:var(--muted); background:var(--panel-hi); padding:2px 7px; border-radius:5px;
+  }
+  .modmeta p{ font-size:12.5px; color:var(--muted); line-height:1.4; }
+  .modmeta .subline{ font-family:'JetBrains Mono'; font-size:11px; color:#5f6a71; margin-top:4px; }
+
+  .installbtn{
+    flex-shrink:0; min-width:104px; height:36px; border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--panel-hi);
+    color:var(--text); font-size:12.5px; font-weight:500;
+    cursor:pointer; position:relative; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .installbtn:hover{ border-color:var(--ember-dim); }
+  .installbtn .ibar{ position:absolute; left:0; top:0; bottom:0; width:0%; background:rgba(255,157,61,.22); transition:width .2s linear; }
+  .installbtn.installed{ background:rgba(92,179,125,.12); border-color:var(--moss); color:var(--moss); }
+  .installbtn.installed:hover{ background:rgba(217,90,90,.12); border-color:#d95a5a; color:#d95a5a; }
+  .installbtn.installed:hover .ibtxt::before{ content:'Remove'; }
+  .installbtn.installed .ibtxt{ font-size:0; }
+  .installbtn.installed .ibtxt::before{ content:'Installed'; font-size:12.5px; }
+  .installbtn.installing{ pointer-events:none; color:var(--muted); }
+
+  .wincontrols{
+    display:flex; align-items:center;
+    -webkit-app-region:no-drag;
+    margin-left:10px;
+  }
+  .wincontrols button{
+    width:38px; height:38px;
+    background:none; border:none; color:var(--muted);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    transition:background .12s ease, color .12s ease;
+  }
+  .wincontrols button svg{ width:11px; height:11px; }
+  .wincontrols button:hover{ background:var(--panel-hi); color:var(--text); }
+  .wincontrols button.winclose:hover{ background:#d95a5a; color:#fff; }
+
+  .modcard2.incompatible{ opacity:.5; }
+  .modcard2.incompatible:hover{ border-color:var(--line); }
+  .incompat-note{
+    flex-shrink:0; min-width:104px;
+    font-family:'JetBrains Mono'; font-size:11px; color:#d95a5a;
+    text-align:center; line-height:1.4;
+  }
+
+  /* ---------- cosmetics page ---------- */
+  .cosmetic-layout{ display:flex; gap:22px; align-items:flex-start; }
+
+  .cosmetic-preview{
+    width:220px; flex-shrink:0;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:20px 16px; display:flex; flex-direction:column; align-items:center;
+    position:sticky; top:0;
+  }
+  .cosmetic-preview svg{ width:140px; height:230px; }
+  .preview-caption{ margin-top:14px; text-align:center; }
+  .preview-caption .uname2{ font-size:13px; font-weight:600; }
+  .preview-slots{ width:100%; margin-top:16px; display:flex; flex-direction:column; gap:6px; }
+  .preview-slot{
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:11.5px; color:var(--muted);
+    background:var(--panel-hi); border-radius:6px; padding:6px 9px;
+  }
+  .preview-slot .slotval{ color:var(--text); font-weight:500; }
+  .preview-slot .swatch{ width:9px; height:9px; border-radius:2px; display:inline-block; margin-right:6px; vertical-align:middle; }
+
+  .cosmetic-panel{ flex:1; min-width:0; }
+
+  .cosmetic-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(128px, 1fr));
+    gap:12px;
+  }
+  .cosmeticcard{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:12px; display:flex; flex-direction:column; align-items:center; gap:8px;
+    cursor:pointer; transition:border-color .15s ease, transform .15s ease;
+  }
+  .cosmeticcard:hover{ transform:translateY(-2px); border-color:#3a4147; }
+  .cosmeticcard.equipped{ border-color:var(--ember); background:rgba(255,157,61,.08); }
+  .cosmeticcard .swatchtile{
+    width:56px; height:56px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Press Start 2P'; font-size:10px; color:rgba(0,0,0,.55);
+  }
+  .cosmeticcard .noneTile{ background:var(--panel-hi) !important; color:var(--muted) !important; font-family:'Rubik'; font-size:11px; }
+  .cosmeticcard .cname{ font-size:12.5px; font-weight:500; text-align:center; }
+  .cosmeticcard .cstate{
+    font-family:'JetBrains Mono'; font-size:10px; text-transform:uppercase; letter-spacing:.5px;
+    color:var(--muted);
+  }
+  .cosmeticcard.equipped .cstate{ color:var(--ember); }
+
+  /* ---------- login modal ---------- */
+  .loginmodal-backdrop{
+    position:absolute; inset:0; z-index:100;
+    background:rgba(0,0,0,.6);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .loginmodal{
+    width:380px; background:var(--stone); border:1px solid var(--line);
+    border-radius:12px; padding:26px 28px;
+  }
+  .loginmodal h3{ font-size:16px; margin:6px 0 12px; word-break:break-all; }
+  .loginmodal p{ font-size:12.5px; color:var(--muted); margin-bottom:10px; }
+  .logincode{
+    font-family:'JetBrains Mono'; font-size:26px; letter-spacing:3px;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:14px; text-align:center; color:var(--ember); margin-bottom:14px;
+  }
+  .loginhint{ font-size:11px; font-style:italic; color:#5f6a71; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="motes" id="motes"></div>
+
+  <div id="sidebar">
+    <div class="brandmark">LC</div>
+    <div class="navitem active" data-tip="Home" data-page="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+      <span class="tip">Home</span>
+    </div>
+    <div class="navitem" data-tip="Mods" data-page="mods">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.5 5 5.5.8-4 3.9.9 5.5L12 14.8 7.1 17.2l.9-5.5-4-3.9L9.5 7z"/></svg>
+      <span class="tip">Mods</span>
+    </div>
+    <div class="navitem disabled" data-tip="Coming soon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2s-4 3-4 7a4 4 0 008 0c0-4-4-7-4-7z"/><path d="M6 13c0 5 2.5 9 6 9s6-4 6-9"/></svg>
+      <span class="tip">Coming soon</span>
+    </div>
+    <div class="navitem disabled" data-tip="Coming soon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 14h16"/><path d="M9 4v6"/></svg>
+      <span class="tip">Coming soon</span>
+    </div>
+    <div class="spacer" style="flex:1"></div>
+    <div class="navitem" data-tip="Settings" data-page="other" data-title="SETTINGS">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.6 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 010-4h.09A1.65 1.65 0 003.6 8.6a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H8a1.65 1.65 0 001-1.51V2a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V8c.14.42.4.79.75 1.06.35.27.77.42 1.21.44H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span class="tip">Settings</span>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="topbar">
+      <div class="titlecluster">
+        <span class="name" style="font-size:10px;">LETHAL CLIENT</span>
+        <span class="ver">Fabric · Java Edition</span>
+      </div>
+      <div class="topbar-right">
+        <div class="account" id="accountChip">
+          <img class="skinhead" id="skinheadImg" src="https://mc-heads.net/avatar/steve/64" alt="" onerror="this.onerror=null; this.src='https://mc-heads.net/avatar/steve/64';">
+          <span class="uname" id="unameLabel">Sign in with Microsoft</span>
+          <span class="caret">▾</span>
+        </div>
+        <div class="wincontrols">
+          <button id="winMinimize" title="Minimize">
+            <svg viewBox="0 0 12 12"><rect x="2" y="5.5" width="8" height="1.2" fill="currentColor"/></svg>
+          </button>
+          <button id="winMaximize" title="Maximize">
+            <svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>
+          </button>
+          <button id="winClose" class="winclose" title="Close">
+            <svg viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="loginModal" class="loginmodal-backdrop" style="display:none;">
+      <div class="loginmodal">
+        <div class="eyebrow">// microsoft sign-in</div>
+        <h3>Continue in your browser</h3>
+        <p>A Microsoft sign-in page just opened in your default browser. Sign in there with your Minecraft-owning account.</p>
+        <p class="loginhint">This window closes automatically once you finish over there.</p>
+      </div>
+    </div>
+
+    <div id="content">
+      <div id="newsfeed" class="page active" data-pageid="home">
+        <div class="hero-landing">
+          <div class="hero-bg">
+            <div class="hero-sun"></div>
+            <div class="hero-hill hero-hill-back"></div>
+            <div class="hero-hill hero-hill-front"></div>
+          </div>
+
+          <div class="hero-content">
+            <div class="hero-character" id="heroCharacterWrap">
+              <div class="hero-glow"></div>
+              <img id="heroCharacterImg" src="https://minotar.net/armor/body/steve/300.png" alt="" onerror="this.onerror=null; this.src='https://minotar.net/armor/body/steve/300.png';">
+              <div class="hero-pedestal"></div>
+            </div>
+            <div class="hero-username" id="heroUsername">Sign in to play</div>
+
+            <div class="hero-actions">
+              <button id="heroPlayBtn" class="hero-playbtn">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                PLAY NOW
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="community-servers">
+          <div class="eyebrow">// your servers</div>
+          <div class="addserver-row">
+            <input type="text" id="addServerInput" placeholder="Add a server address, e.g. play.example.net">
+            <button id="addServerBtn">Add</button>
+          </div>
+          <div class="serverlist" id="serverList">
+            <div class="serverrow" data-address="DonutSMP.net">
+              <div class="servericon" style="background:linear-gradient(135deg,#d9b23c,#7a5c1e);">D</div>
+              <div class="servermeta">
+                <h4>DonutSMP</h4>
+                <div class="serversub">donutsmp.net</div>
+              </div>
+              <div class="serverstatus" data-status>Checking…</div>
+              <button class="serverremove" title="Remove">×</button>
+            </div>
+            <div class="serverrow" data-address="McPVP.club">
+              <div class="servericon" style="background:linear-gradient(135deg,#d95a5a,#5a1f1f);">M</div>
+              <div class="servermeta">
+                <h4>McPVP</h4>
+                <div class="serversub">mcpvp.club</div>
+              </div>
+              <div class="serverstatus" data-status>Checking…</div>
+              <button class="serverremove" title="Remove">×</button>
+            </div>
+            <div class="serverrow" data-address="Hypixel.net">
+              <div class="servericon" style="background:linear-gradient(135deg,#4f8fd6,#1f2f45);">H</div>
+              <div class="servermeta">
+                <h4>Hypixel</h4>
+                <div class="serversub">hypixel.net</div>
+              </div>
+              <div class="serverstatus" data-status>Checking…</div>
+              <button class="serverremove" title="Remove">×</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="modsPage" class="page" data-pageid="mods">
+        <div class="modslib-head">
+          <div class="searchbar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="modSearch" type="text" placeholder="Search mods…">
+          </div>
+          <div class="counts"><b id="installedCount">0</b> / <span id="totalCount">0</span> mods installed</div>
+        </div>
+
+        <div class="tabs" id="modTabs">
+          <div class="tab active" data-cat="all">All</div>
+          <div class="tab" data-cat="mine">Your Mods</div>
+          <div class="tab" data-cat="performance">Performance</div>
+          <div class="tab" data-cat="utility">Utility</div>
+          <div class="tab" data-cat="cosmetic">Cosmetic</div>
+          <div class="tab" data-cat="library">Library</div>
+        </div>
+
+        <div class="modlist" id="modList"></div>
+      </div>
+
+      <div id="cosmeticsPage" class="page" data-pageid="cosmetics">
+        <div class="eyebrow">// cosmetics</div>
+        <div class="hero" style="font-size:16px;">EQUIP YOUR LOOK</div>
+
+        <div class="cosmetic-layout">
+          <div class="cosmetic-preview">
+            <svg viewBox="0 0 120 210" xmlns="http://www.w3.org/2000/svg">
+              <clipPath id="capeClip"><path d="M38 58 L82 58 L92 158 L28 158 Z"/></clipPath>
+              <path id="capeShape" d="M38 58 L82 58 L92 158 L28 158 Z" fill="transparent"/>
+              <image id="capeImageShape" x="28" y="58" width="64" height="100" clip-path="url(#capeClip)" preserveAspectRatio="xMidYMid slice" style="display:none;"/>
+              <rect x="40" y="55" width="40" height="68" rx="6" fill="#333a40"/>
+              <rect x="46" y="22" width="28" height="28" rx="4" fill="#c99160"/>
+              <g id="hatShape"></g>
+            </svg>
+            <div class="preview-caption">
+              <div class="uname2">Steve_Miner42</div>
+            </div>
+            <div class="preview-slots" id="previewSlots"></div>
+          </div>
+
+          <div class="cosmetic-panel">
+            <div class="tabs" id="cosmeticTabs">
+              <div class="tab active" data-cat="cape">Capes</div>
+              <div class="tab" data-cat="hat">Hats</div>
+              <div class="tab" data-cat="emote">Emotes</div>
+            </div>
+            <div class="cosmetic-grid" id="cosmeticGrid"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="skinsPage" class="page" data-pageid="skins">
+        <div class="eyebrow">// skins</div>
+        <div class="hero" style="font-size:16px;">CHANGE YOUR SKIN</div>
+        <p style="color:var(--muted); font-size:13px; max-width:460px; margin-bottom:20px;">
+          This uploads a real skin to your Microsoft account through Mojang's own skin API — the same
+          thing minecraft.net's skin page does. Sign in first; changes apply to your actual account
+          and show up in-game for everyone.
+        </p>
+
+        <div class="skins-layout">
+          <div class="skins-preview">
+            <img id="skinPreviewImg" src="https://minotar.net/armor/body/steve/220.png" alt="">
+            <div class="skins-preview-label" id="skinPreviewLabel">Sign in to see your current skin</div>
+          </div>
+
+          <div class="skins-controls">
+            <span class="fieldlabel">Model</span>
+            <div class="modechoice" id="skinVariantChoice">
+              <button class="modebtn active" data-variant="classic">
+                <span class="modebtn-title">Classic</span>
+                <span class="modebtn-sub">4px wide arms</span>
+              </button>
+              <button class="modebtn" data-variant="slim">
+                <span class="modebtn-title">Slim</span>
+                <span class="modebtn-sub">3px wide arms (Alex-style)</span>
+              </button>
+            </div>
+
+            <span class="fieldlabel">Skin file</span>
+            <div class="addserver-row">
+              <input type="text" id="skinFileNameDisplay" placeholder="No file chosen" readonly>
+              <button id="chooseSkinBtn">Choose</button>
+            </div>
+            <input type="file" id="skinFileInput" accept="image/png" style="display:none;">
+
+            <button id="uploadSkinBtn" class="hero-playbtn" style="margin-top:16px; width:100%; justify-content:center;">
+              Upload Skin
+            </button>
+            <div id="skinStatus" style="margin-top:10px; font-family:'JetBrains Mono'; font-size:11.5px; color:var(--muted);"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="placeholderPage" class="page" data-pageid="other">
+        <div class="eyebrow">// coming soon</div>
+        <div class="hero" style="font-size:16px;" id="placeholderTitle">SERVERS</div>
+        <p style="color:var(--muted); font-size:13px; max-width:420px;">This panel isn't wired up in this demo — the Home and Mods pages are the fully working parts.</p>
+      </div>
+
+      <div id="playrail">
+        <span class="fieldlabel">Platform</span>
+        <div class="select" style="cursor:default;">
+          <span>Fabric · Java Edition</span>
+          <span style="color:var(--moss); font-size:11px;">Fixed</span>
+        </div>
+
+        <span class="fieldlabel">Version</span>
+        <div class="versionpicker" id="versionPicker">
+          <div class="select" id="versionSelect">
+            <span id="versionLabel">26.2</span>
+            <span>▾</span>
+          </div>
+          <div class="selectlist" id="versionList">
+            <div class="selectitem active" data-version="26.2">26.2</div>
+            <div class="selectitem" data-version="26.1.2">26.1.2</div>
+            <div class="selectitem" data-version="26.1.1">26.1.1</div>
+            <div class="selectitem" data-version="26.1">26.1</div>
+            <div class="selectitem" data-version="1.21.11">1.21.11</div>
+            <div class="selectitem" data-version="1.21.10">1.21.10</div>
+            <div class="selectitem" data-version="1.21.9">1.21.9</div>
+            <div class="selectitem" data-version="1.21.8">1.21.8</div>
+          </div>
+        </div>
+
+        <span class="fieldlabel">Play mode</span>
+        <div class="modechoice" id="modeChoice">
+          <button class="modebtn" data-mode="nomods">
+            <span class="modebtn-title">No Mods</span>
+            <span class="modebtn-sub">Vanilla Fabric only</span>
+          </button>
+          <button class="modebtn active" data-mode="mods">
+            <span class="modebtn-title">With Mods</span>
+            <span class="modebtn-sub" id="modsSubline">0 installed mods</span>
+          </button>
+        </div>
+
+        <div class="spacer"></div>
+
+        <div class="fps">
+          <span>Allocated RAM</span><span><b>6</b> GB</span>
+        </div>
+
+        <button id="playbtn">
+          <div class="flicker"></div>
+          <span id="playlabel">PLAY</span>
+          <div class="barwrap" id="barwrap"><div class="barfill" id="barfill"></div></div>
+        </button>
+        <div id="status">Ready to launch</div>
+        <div id="demoNotice">Requires Java installed on your PC, and a Minecraft-owning Microsoft account.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ambient motes
+  const motesEl = document.getElementById('motes');
+  for(let i=0;i<24;i++){
+    const m = document.createElement('div');
+    m.className='mote';
+    m.style.left = Math.random()*100+'%';
+    m.style.bottom = (Math.random()*40)+'px';
+    m.style.setProperty('--drift', (Math.random()*40-20)+'px');
+    m.style.animationDelay = (Math.random()*7)+'s';
+    m.style.animationDuration = (5+Math.random()*4)+'s';
+    motesEl.appendChild(m);
+  }
+
+  // ---------- nav / page switching ----------
+  document.querySelectorAll('.navitem').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      if(item.classList.contains('disabled')) return;
+
+      document.querySelectorAll('.navitem').forEach(n=>n.classList.remove('active'));
+      item.classList.add('active');
+
+      const pageId = item.getAttribute('data-page');
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+      document.querySelector(`.page[data-pageid="${pageId}"]`).classList.add('active');
+
+      if(pageId === 'other'){
+        document.getElementById('placeholderTitle').textContent = item.getAttribute('data-title') || '';
+      }
+    });
+  });
+
+  // ---------- mod library ----------
+  const modsCatalog = [
+    { id:'sodium', name:'Sodium', cat:'performance', color:'#5cb37d', size:'1.9 MB', author:'CaffeineMC', desc:'High-performance rendering engine replacement — big FPS boost.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10'] },
+    { id:'sodium-extra', name:'Sodium Extra', cat:'performance', color:'#d9b23c', size:'0.4 MB', author:'FlashyReese', desc:'Extra HUD toggles and fine-tuning options for Sodium.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10'] },
+    { id:'reeses-sodium-options', name:"Reese's Sodium Options", cat:'performance', color:'#d9b23c', size:'0.1 MB', author:'FlashyReese', desc:"Extra graphics options built on top of Sodium's settings screen.", installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'lithium', name:'Lithium', cat:'performance', color:'#4f8fd6', size:'0.9 MB', author:'CaffeineMC', desc:'No-compromises game logic optimization, single-player or server.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10','1.21.9','1.21.8'] },
+    { id:'ferritecore', name:'FerriteCore', cat:'performance', color:'#b3661f', size:'0.1 MB', author:'malte0811', desc:'Reduces memory usage, especially in large worlds.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10','1.21.9'] },
+    { id:'immediatelyfast', name:'ImmediatelyFast', cat:'performance', color:'#4fd6c4', size:'0.3 MB', author:'RaphiMC', desc:'Speeds up immediate-mode rendering — text, GUIs, tooltips.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'dynamic-fps', name:'Dynamic FPS', cat:'performance', color:'#7c5cb3', size:'0.1 MB', author:'juliand665', desc:'Cuts FPS and CPU use automatically while tabbed out.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10','1.21.9','1.21.8'] },
+    { id:'entityculling', name:'Entity Culling', cat:'performance', color:'#8b9299', size:'0.1 MB', author:'tr7zw', desc:"Skips rendering entities the camera can't actually see.", installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10'] },
+    { id:'low-fire', name:'Low Fire', cat:'cosmetic', color:'#ff9d3d', size:'0.05 MB', author:'Oculie', desc:"Shrinks the in-game fire overlay so it doesn't block your view.", installed:false, versions:['26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'marlows-crystal-optimizer', name:"Marlow's Crystal Optimizer", cat:'performance', color:'#d95a5a', size:'0.1 MB', author:'DevBram', desc:'Optimizes end crystal placement and rendering for PvP.', installed:false, versions:['26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'heros-anchor-optimizer', name:"Hero's Anchor Optimizer", cat:'performance', color:'#d95a5a', size:'0.05 MB', author:'Hero', desc:'Optimizes respawn anchor explosions for PvP performance.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'fabric-api', name:'Fabric API', cat:'library', color:'#8b9299', size:'2.3 MB', author:'modmuss50', desc:'Core hooks and APIs almost every other Fabric mod depends on.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10','1.21.9','1.21.8'] },
+    { id:'fabric-language-kotlin', name:'Fabric Language Kotlin', cat:'library', color:'#7c5cb3', size:'7.3 MB', author:'modmuss50', desc:'Lets Fabric mods written in Kotlin load correctly.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'cloth-config', name:'Cloth Config API', cat:'library', color:'#5cb37d', size:'0.5 MB', author:'shedaniel', desc:'Builder-based config screen library used by many other mods.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10'] },
+    { id:'malilib', name:'MaLiLib', cat:'library', color:'#d95a5a', size:'1.9 MB', author:'masa', desc:'Shared library required by Litematica and other masa mods.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'geckolib', name:'Geckolib', cat:'library', color:'#4f8fd6', size:'0.6 MB', author:'Gecko', desc:'Animation library used by many mods with custom entity models.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'ukulib', name:'ukulib', cat:'library', color:'#8b9299', size:'0.4 MB', author:'ThatGravyBoat', desc:'Shared library dependency for several small utility mods.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'placeholder-api', name:'Text Placeholder API', cat:'library', color:'#8b9299', size:'0.1 MB', author:'Patbox', desc:'Lets other mods insert dynamic text into messages and HUDs.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10'] },
+    { id:'yacl', name:'Yet Another Config Lib', cat:'library', color:'#4fd6c4', size:'1.1 MB', author:'isXander', desc:'Shared config-screen library used by several mods.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'jade', name:'Jade', cat:'utility', color:'#d9b23c', size:'0.9 MB', author:'Snownee', desc:'Shows an info tooltip for whatever block or entity you look at.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'litematica', name:'Litematica', cat:'utility', color:'#7c5cb3', size:'1.8 MB', author:'masa', desc:'Loads and overlays schematics for building, needs MaLiLib.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'map-tooltip', name:'Map Tooltip', cat:'utility', color:'#4f8fd6', size:'0.1 MB', author:'VendoAU', desc:'Shows a small map preview when hovering over map items.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'mouse-tweaks', name:'Mouse Tweaks', cat:'utility', color:'#8b9299', size:'0.1 MB', author:'YaLTeR', desc:'Adds click-and-drag and right-click-drag inventory shortcuts.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'shulkerboxtooltip', name:'Shulker Box Tooltip', cat:'utility', color:'#7c5cb3', size:'0.4 MB', author:'MisterPeModder', desc:"Shows a shulker box's contents when you hover over it.", installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'svc', name:'Simple Voice Chat', cat:'utility', color:'#d95a5a', size:'5.3 MB', author:'henkelmax', desc:'In-game proximity voice chat, no Discord required.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10'] },
+    { id:'flashback', name:'Flashback', cat:'utility', color:'#8b9299', size:'201.7 MB', author:'Moulberry', desc:'Records and replays gameplay footage from any angle.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'worldedit', name:'WorldEdit', cat:'utility', color:'#5cb37d', size:'6.6 MB', author:'EngineHub', desc:'In-game world editing tools — copy, paste, fill, and more.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'whoami', name:'WhoAmI', cat:'utility', color:'#8b9299', size:'0.01 MB', author:'Earthcomputer', desc:'Small debug/utility mod, tiny footprint.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'map-in-slot', name:'Map in Slot', cat:'cosmetic', color:'#4f8fd6', size:'0.02 MB', author:'community', desc:'Renders a mini map preview directly in the item slot icon.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'modmenu', name:'Mod Menu', cat:'utility', color:'#4f8fd6', size:'1.1 MB', author:'TerraformersMC', desc:'Adds an in-game screen listing and configuring your mods.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10','1.21.9'] },
+    { id:'small-shield-totem', name:'Small Shield & Totem', cat:'cosmetic', color:'#4f8fd6', size:'0.02 MB', author:'blobh', desc:'Shrinks the oversized shield and totem-of-undying overlays.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'fullbright', name:'Fullbright', cat:'cosmetic', color:'#d9b23c', size:'0.02 MB', author:'community', desc:'Lets you see clearly in the dark without changing gamma files.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'freelook', name:'Freelook', cat:'cosmetic', color:'#7c5cb3', size:'0.04 MB', author:'tudou', desc:'Look around independently of your movement direction with a keybind.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'ukus-armor-hud', name:"UKU's Armor HUD", cat:'cosmetic', color:'#4fd6c4', size:'0.05 MB', author:'community', desc:'Adds a compact armor durability display to the HUD.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+    { id:'zoomify', name:'Zoomify', cat:'utility', color:'#4fd6c4', size:'0.9 MB', author:'TropheusJ', desc:'Adds a held-key zoom, like an optical scope for your eyes.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10'] },
+    { id:'essential', name:'Essential', cat:'utility', color:'#4f8fd6', size:'50.6 MB', author:'SparkUniverse', desc:'Cosmetics, multiplayer utility, and social features in one mod.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
+  ];
+
+  const modListEl = document.getElementById('modList');
+  const installedCountEl = document.getElementById('installedCount');
+  const totalCountEl = document.getElementById('totalCount');
+  let activeCat = 'all';
+  let searchTerm = '';
+  let currentVersion = '26.2';
+
+  function initials(name){
+    return name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  }
+
+  let allInstalledModIds = []; // union of mod IDs installed across every version — powers "Your Mods"
+
+  async function refreshAllInstalledModIds(){
+    try{
+      allInstalledModIds = await window.api.getAllInstalledModIds();
+    }catch(err){
+      console.error('Could not load your mods list', err);
+    }
+  }
+
+  function renderMods(){
+    let filtered;
+
+    if(activeCat === 'mine'){
+      // Your Mods: everything installed anywhere, even if it can't run on
+      // the currently selected version — those get shown grayed out instead
+      // of hidden, so you can see your whole collection at a glance.
+      filtered = modsCatalog.filter(m=>
+        allInstalledModIds.includes(m.id) &&
+        (m.name.toLowerCase().includes(searchTerm) || m.desc.toLowerCase().includes(searchTerm))
+      );
+    } else {
+      // Normal category tabs only ever show mods that actually work on
+      // whatever version is currently selected.
+      filtered = modsCatalog.filter(m=>{
+        const matchesCat = activeCat === 'all' || m.cat === activeCat;
+        const matchesSearch = m.name.toLowerCase().includes(searchTerm) || m.desc.toLowerCase().includes(searchTerm);
+        const compatible = m.versions.includes(currentVersion);
+        return matchesCat && matchesSearch && compatible;
+      });
+    }
+
+    modListEl.innerHTML = '';
+    filtered.forEach(mod=>{
+      const compatible = mod.versions.includes(currentVersion);
+      const row = document.createElement('div');
+      row.className = 'modcard2' + (compatible ? '' : ' incompatible');
+
+      const actionHtml = compatible
+        ? `<button class="installbtn ${mod.installed ? 'installed' : ''}" data-id="${mod.id}">
+             <div class="ibar"></div>
+             <span class="ibtxt">${mod.installed ? 'Installed' : 'Install'}</span>
+           </button>`
+        : `<div class="incompat-note">Not compatible<br>with ${currentVersion}</div>`;
+
+      row.innerHTML = `
+        <div class="modicon" style="background:${mod.color}">${initials(mod.name)}</div>
+        <div class="modmeta">
+          <div class="toprow">
+            <h4>${mod.name}</h4>
+            <span class="cat">${mod.cat}</span>
+          </div>
+          <p>${mod.desc}</p>
+          <div class="subline">by ${mod.author} · ${mod.size} · works on ${mod.versions.join(', ')}</div>
+        </div>
+        ${actionHtml}
+      `;
+      modListEl.appendChild(row);
+    });
+
+    const installedCount = modsCatalog.filter(m=>m.installed).length;
+    installedCountEl.textContent = installedCount;
+    totalCountEl.textContent = modsCatalog.length;
+
+    modListEl.querySelectorAll('.installbtn').forEach(btn=>{
+      btn.addEventListener('click', ()=> handleInstallClick(btn));
+    });
+  }
+
+  async function handleInstallClick(btn){
+    const id = btn.getAttribute('data-id');
+    const mod = modsCatalog.find(m=>m.id === id);
+    if(!mod || btn.classList.contains('installing')) return;
+
+    const ibar = btn.querySelector('.ibar');
+    const ibtxt = btn.querySelector('.ibtxt');
+
+    if(mod.installed){
+      btn.classList.add('installing');
+      ibtxt.textContent = 'Removing…';
+      try{
+        await window.api.removeMod(mod.id, currentVersion);
+        mod.installed = false;
+      }catch(err){
+        alert(`Couldn't remove ${mod.name}: ${err.message}`);
+      }
+      await refreshAllInstalledModIds();
+      renderMods();
+      return;
+    }
+
+    btn.classList.add('installing');
+    ibtxt.textContent = 'Installing…';
+    ibar.style.width = '55%'; // real download time is unknown, so this is just an in-progress indicator
+
+    try{
+      await window.api.installMod(mod.id, currentVersion);
+      mod.installed = true;
+      ibar.style.width = '100%';
+    }catch(err){
+      alert(`Couldn't install ${mod.name}: ${err.message}`);
+    }
+    await refreshAllInstalledModIds();
+    setTimeout(renderMods, 150);
+  }
+
+  // Load real installed state from the persisted manifest for whichever
+  // version is currently selected — each version has its own mods folder now
+  async function syncModsFromManifest(){
+    try{
+      const manifest = await window.api.getModManifest(currentVersion);
+      modsCatalog.forEach(m=> m.installed = !!manifest[m.id]);
+      await refreshAllInstalledModIds();
+      renderMods();
+    }catch(err){
+      console.error('Could not load mod manifest', err);
+    }
+  }
+  syncModsFromManifest();
+
+  document.getElementById('modTabs').addEventListener('click', async (e)=>{
+    const tab = e.target.closest('.tab');
+    if(!tab) return;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    activeCat = tab.getAttribute('data-cat');
+    if(activeCat === 'mine') await refreshAllInstalledModIds();
+    renderMods();
+  });
+
+  document.getElementById('modSearch').addEventListener('input', (e)=>{
+    searchTerm = e.target.value.toLowerCase();
+    renderMods();
+  });
+
+  renderMods();
+
+  // ---------- cosmetics ----------
+  const cosmeticsCatalog = [
+    { id:'ember-cape',   name:'Ember Cape',    cat:'cape',  color:'#ff9d3d', equipped:true  },
+    { id:'storm-cape',   name:'Storm Cape',    cat:'cape',  color:'#4f8fd6', equipped:false },
+    { id:'void-cape',    name:'Void Cape',     cat:'cape',  color:'#7c5cb3', equipped:false },
+    { id:'top-hat',      name:'Top Hat',       cat:'hat',   color:'#2e353b', equipped:false },
+    { id:'halo',         name:'Halo',          cat:'hat',   color:'#d9b23c', equipped:true  },
+    { id:'wave',         name:'Wave',          cat:'emote', color:'#5cb37d', equipped:true  },
+    { id:'salute',       name:'Salute',        cat:'emote', color:'#4f8fd6', equipped:false },
+    { id:'bow',          name:'Bow',           cat:'emote', color:'#7c5cb3', equipped:false },
+  ];
+
+  // Restore any custom-uploaded capes from previous sessions
+  try{
+    const savedCapes = JSON.parse(localStorage.getItem('lethal-custom-capes') || '[]');
+    savedCapes.forEach(c=> cosmeticsCatalog.push(c));
+  }catch(err){ console.error('Could not load custom capes', err); }
+
+  function saveCustomCapes(){
+    const customCapes = cosmeticsCatalog.filter(c=> c.cat === 'cape' && c.image);
+    localStorage.setItem('lethal-custom-capes', JSON.stringify(customCapes));
+  }
+
+  const catLabels = { cape:'Cape', hat:'Hat', emote:'Emote' };
+  const cosmeticGridEl = document.getElementById('cosmeticGrid');
+  const previewSlotsEl = document.getElementById('previewSlots');
+  let activeCosmeticCat = 'cape';
+
+  function equippedIn(cat){
+    return cosmeticsCatalog.find(c=> c.cat === cat && c.equipped) || null;
+  }
+
+  function renderCosmetics(){
+    cosmeticGridEl.innerHTML = '';
+
+    // synthetic "None" tile so a whole slot can be cleared, like Essential's cosmetics menu
+    const noneCard = document.createElement('div');
+    const noneEquipped = !equippedIn(activeCosmeticCat);
+    noneCard.className = 'cosmeticcard' + (noneEquipped ? ' equipped' : '');
+    noneCard.innerHTML = `
+      <div class="swatchtile noneTile">None</div>
+      <div class="cname">No ${catLabels[activeCosmeticCat]}</div>
+      <div class="cstate">${noneEquipped ? 'Equipped' : 'Select'}</div>
+    `;
+    noneCard.addEventListener('click', ()=>{
+      cosmeticsCatalog.filter(c=>c.cat === activeCosmeticCat).forEach(c=> c.equipped = false);
+      renderCosmetics();
+      updatePreview();
+    });
+    cosmeticGridEl.appendChild(noneCard);
+
+    // Upload tile — only on the Capes tab
+    if(activeCosmeticCat === 'cape'){
+      const uploadCard = document.createElement('div');
+      uploadCard.className = 'cosmeticcard';
+      uploadCard.innerHTML = `
+        <div class="swatchtile noneTile" style="font-size:22px;">+</div>
+        <div class="cname">Upload Cape</div>
+        <div class="cstate">Custom image</div>
+      `;
+      uploadCard.addEventListener('click', ()=> document.getElementById('capeFileInput').click());
+      cosmeticGridEl.appendChild(uploadCard);
+    }
+
+    cosmeticsCatalog.filter(c=> c.cat === activeCosmeticCat).forEach(item=>{
+      const card = document.createElement('div');
+      card.className = 'cosmeticcard' + (item.equipped ? ' equipped' : '');
+      const swatchStyle = item.image
+        ? `background-image:url(${item.image}); background-size:cover; background-position:center;`
+        : `background:${item.color}`;
+      card.innerHTML = `
+        <div class="swatchtile" style="${swatchStyle}"></div>
+        <div class="cname">${item.name}</div>
+        <div class="cstate">${item.equipped ? 'Equipped' : 'Equip'}</div>
+      `;
+      card.addEventListener('click', ()=>{
+        cosmeticsCatalog.filter(c=>c.cat === activeCosmeticCat).forEach(c=> c.equipped = false);
+        item.equipped = true;
+        renderCosmetics();
+        updatePreview();
+      });
+      cosmeticGridEl.appendChild(card);
+    });
+  }
+
+  function updatePreview(){
+    const cape = equippedIn('cape');
+    const hat = equippedIn('hat');
+
+    const capeShapeEl = document.getElementById('capeShape');
+    const capeImageEl = document.getElementById('capeImageShape');
+    if(cape && cape.image){
+      capeShapeEl.setAttribute('fill', 'transparent');
+      capeImageEl.setAttribute('href', cape.image);
+      capeImageEl.style.display = 'block';
+    } else {
+      capeImageEl.style.display = 'none';
+      capeShapeEl.setAttribute('fill', cape ? cape.color : 'transparent');
+    }
+
+    const hatShape = document.getElementById('hatShape');
+    hatShape.innerHTML = hat ? `<rect x="44" y="14" width="32" height="10" rx="2" fill="${hat.color}"></rect>` : '';
+
+    previewSlotsEl.innerHTML = ['cape','hat','emote'].map(cat=>{
+      const item = equippedIn(cat);
+      const swatch = item?.image
+        ? `<span class="swatch" style="background-image:url(${item.image}); background-size:cover;"></span>`
+        : `<span class="swatch" style="background:${item ? item.color : '#2e353b'}"></span>`;
+      return `<div class="preview-slot">
+        <span>${swatch}${catLabels[cat]}</span>
+        <span class="slotval">${item ? item.name : 'None'}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Hidden file input used by the Upload Cape tile
+  const capeFileInput = document.createElement('input');
+  capeFileInput.type = 'file';
+  capeFileInput.accept = 'image/*';
+  capeFileInput.id = 'capeFileInput';
+  capeFileInput.style.display = 'none';
+  document.body.appendChild(capeFileInput);
+
+  capeFileInput.addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      cosmeticsCatalog.filter(c=>c.cat === 'cape').forEach(c=> c.equipped = false);
+      const newCape = {
+        id: 'custom-cape-' + Date.now(),
+        name: file.name.replace(/\.[^.]+$/, '').slice(0, 24) || 'Custom Cape',
+        cat: 'cape',
+        image: reader.result,
+        equipped: true,
+      };
+      cosmeticsCatalog.push(newCape);
+      saveCustomCapes();
+      renderCosmetics();
+      updatePreview();
+    };
+    reader.readAsDataURL(file);
+    capeFileInput.value = ''; // allow re-selecting the same file later
+  });
+
+  document.getElementById('cosmeticTabs').addEventListener('click', (e)=>{
+    const tab = e.target.closest('.tab');
+    if(!tab) return;
+    document.querySelectorAll('#cosmeticTabs .tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    activeCosmeticCat = tab.getAttribute('data-cat');
+    renderCosmetics();
+  });
+
+  renderCosmetics();
+  updatePreview();
+
+  // ---------- community servers: real live status, no made-up numbers ----------
+  async function checkServerStatus(row){
+    const address = row.getAttribute('data-address');
+    const statusEl = row.querySelector('[data-status]');
+    const iconEl = row.querySelector('.servericon');
+    const controller = new AbortController();
+    const timeout = setTimeout(()=> controller.abort(), 6000);
+    try{
+      const res = await fetch(`https://api.mcsrvstat.us/3/${encodeURIComponent(address)}`, { signal: controller.signal });
+      clearTimeout(timeout);
+      const data = await res.json();
+      if(data.online){
+        statusEl.innerHTML = `<span class="dot"></span>${data.players?.online ?? '?'} online`;
+      } else {
+        statusEl.innerHTML = `<span class="dot" style="background:#5f6a71; box-shadow:none;"></span>Offline`;
+      }
+      if(data.icon && iconEl){
+        iconEl.style.background = `url(${data.icon})`;
+        iconEl.style.backgroundSize = 'cover';
+        iconEl.textContent = '';
+      }
+    }catch(err){
+      clearTimeout(timeout);
+      statusEl.textContent = err.name === 'AbortError' ? 'Timed out' : 'Status unavailable';
+    }
+  }
+
+  const serverListEl = document.getElementById('serverList');
+  const serverColors = ['#5cb37d','#4f8fd6','#7c5cb3','#d95a5a','#d9b23c','#4fd6c4'];
+
+  function saveCustomServers(){
+    const customs = [...serverListEl.querySelectorAll('.serverrow[data-custom]')]
+      .map(row => row.getAttribute('data-address'));
+    localStorage.setItem('lethal-custom-servers', JSON.stringify(customs));
+  }
+
+  function addServerRow(address, isCustom){
+    const row = document.createElement('div');
+    row.className = 'serverrow';
+    row.setAttribute('data-address', address);
+    if(isCustom) row.setAttribute('data-custom', 'true');
+    const color = serverColors[Math.floor(Math.random()*serverColors.length)];
+    row.innerHTML = `
+      <div class="servericon" style="background:${color}">${address[0].toUpperCase()}</div>
+      <div class="servermeta">
+        <h4>${address}</h4>
+        <div class="serversub">${address.toLowerCase()}</div>
+      </div>
+      <div class="serverstatus" data-status>Checking…</div>
+      <button class="serverremove" title="Remove">×</button>
+    `;
+    row.querySelector('.serverremove').addEventListener('click', ()=>{
+      row.remove();
+      saveCustomServers();
+    });
+    serverListEl.appendChild(row);
+    checkServerStatus(row);
+  }
+
+  document.getElementById('addServerBtn').addEventListener('click', ()=>{
+    const input = document.getElementById('addServerInput');
+    const address = input.value.trim();
+    if(!address) return;
+    addServerRow(address, true);
+    saveCustomServers();
+    input.value = '';
+  });
+  document.getElementById('addServerInput').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') document.getElementById('addServerBtn').click();
+  });
+
+  // Restore any servers the user added in a previous session
+  try{
+    const savedServers = JSON.parse(localStorage.getItem('lethal-custom-servers') || '[]');
+    savedServers.forEach(addr => addServerRow(addr, true));
+  }catch(err){ console.error('Could not load custom servers', err); }
+
+  // Give the default (non-removable-by-design, but still removable if you want) three a remove button too
+  document.querySelectorAll('#serverList .serverrow[data-address]:not([data-custom])').forEach(row=>{
+    const removeBtn = row.querySelector('.serverremove');
+    removeBtn?.addEventListener('click', ()=> row.remove());
+  });
+
+  document.querySelectorAll('#serverList .serverrow[data-address]').forEach(checkServerStatus);
+
+  // ---------- version picker ----------
+  const versionSelect = document.getElementById('versionSelect');
+  const versionList = document.getElementById('versionList');
+  const versionLabel = document.getElementById('versionLabel');
+
+  versionSelect.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    versionList.classList.toggle('open');
+  });
+  versionList.addEventListener('click', (e)=>{
+    const item = e.target.closest('.selectitem');
+    if(!item) return;
+    currentVersion = item.getAttribute('data-version');
+    versionLabel.textContent = currentVersion;
+    document.querySelectorAll('.selectitem').forEach(i=>i.classList.remove('active'));
+    item.classList.add('active');
+    versionList.classList.remove('open');
+    syncModsFromManifest(); // each version has its own mods folder — reload real state for it
+  });
+  document.addEventListener('click', ()=> versionList.classList.remove('open'));
+
+  // ---------- play mode (No Mods / With Mods) ----------
+  let playMode = 'mods'; // 'nomods' | 'mods'
+
+  function compatibleInstalledMods(){
+    return modsCatalog.filter(m=> m.installed && m.versions.includes(currentVersion));
+  }
+
+  function updateModsSubline(){
+    const count = compatibleInstalledMods().length;
+    document.getElementById('modsSubline').textContent =
+      count === 0 ? `No mods installed for ${currentVersion}` : `${count} mod${count === 1 ? '' : 's'} for ${currentVersion}`;
+    const dashCount = document.getElementById('dashModCount');
+    if(dashCount) dashCount.textContent = count;
+  }
+
+  document.getElementById('modeChoice').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.modebtn');
+    if(!btn) return;
+    playMode = btn.getAttribute('data-mode');
+    document.querySelectorAll('.modebtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+
+  // keep the "With Mods" subline in sync whenever the mod list re-renders
+  const _renderMods = renderMods;
+  renderMods = function(){
+    _renderMods();
+    updateModsSubline();
+  };
+  updateModsSubline();
+
+  // ---------- real launch, driven by status-update events from main.js ----------
+  const playbtn = document.getElementById('playbtn');
+  const playlabel = document.getElementById('playlabel');
+  const barwrap = document.getElementById('barwrap');
+  const barfill = document.getElementById('barfill');
+  const status = document.getElementById('status');
+
+  // Real progress updates stream in from main.js as the download/launch runs.
+  // We don't know exact percentages for a real download, so the bar just
+  // pulses forward a bit on every status line rather than hitting fixed marks.
+  let progressPct = 0;
+  window.api.onStatus((msg)=>{
+    status.textContent = msg.trim().slice(0, 90);
+    progressPct = Math.min(95, progressPct + 6);
+    barfill.style.width = progressPct + '%';
+  });
+
+  playbtn.addEventListener('click', async ()=>{
+    if(playbtn.classList.contains('launching')) return;
+
+    const account = await window.api.getAccount();
+    if(!account){
+      alert('Sign in with Microsoft first (top-right corner).');
+      return;
+    }
+
+    playbtn.classList.add('launching');
+    playlabel.textContent = 'LAUNCHING…';
+    barwrap.classList.add('show');
+    progressPct = 0;
+    barfill.style.width = '0%';
+
+    const activeMods = compatibleInstalledMods();
+    const withMods = playMode === 'mods' && activeMods.length > 0;
+
+    try{
+      await window.api.launchGame(currentVersion, withMods, activeMods.map(m=>m.id));
+      barfill.style.width = '100%';
+      status.textContent = 'Launched — have fun!';
+    }catch(err){
+      status.textContent = 'Error: ' + err.message;
+    }
+
+    setTimeout(()=>{
+      playbtn.classList.remove('launching');
+      playlabel.textContent = 'PLAY';
+      barwrap.classList.remove('show');
+      barfill.style.width = '0%';
+      if(!status.textContent.startsWith('Error')) status.textContent = 'Ready to launch';
+    }, 1800);
+  });
+
+  // ---------- Microsoft login ----------
+  const accountChip = document.getElementById('accountChip');
+  const unameLabel = document.getElementById('unameLabel');
+  const skinheadImg = document.getElementById('skinheadImg');
+  const loginModal = document.getElementById('loginModal');
+  const heroUsername = document.getElementById('heroUsername');
+
+  function updateAccountDisplay(account){
+    unameLabel.textContent = account.username;
+    heroUsername.textContent = account.username;
+    skinheadImg.onerror = () => { skinheadImg.onerror = null; skinheadImg.src = 'https://mc-heads.net/avatar/steve/64'; };
+    skinheadImg.src = `https://mc-heads.net/avatar/${encodeURIComponent(account.username)}/64`;
+
+    const heroCharacterImg = document.getElementById('heroCharacterImg');
+    heroCharacterImg.onerror = () => { heroCharacterImg.onerror = null; heroCharacterImg.src = 'https://minotar.net/armor/body/steve/300.png'; };
+    heroCharacterImg.src = `https://minotar.net/armor/body/${encodeURIComponent(account.username)}/300.png`;
+  }
+
+  document.getElementById('winMinimize').addEventListener('click', ()=> window.api.minimizeWindow());
+  document.getElementById('winMaximize').addEventListener('click', ()=> window.api.maximizeWindow());
+  document.getElementById('winClose').addEventListener('click', ()=> window.api.closeWindow());
+
+  // ---------- Skins (real Mojang skin upload) ----------
+  document.getElementById('heroPlayBtn').addEventListener('click', ()=>{
+    document.getElementById('playbtn').click();
+  });
+
+  let skinVariant = 'classic';
+  let chosenSkinBase64 = null;
+
+  document.getElementById('skinVariantChoice').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.modebtn');
+    if(!btn) return;
+    skinVariant = btn.getAttribute('data-variant');
+    document.querySelectorAll('#skinVariantChoice .modebtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+
+  document.getElementById('chooseSkinBtn').addEventListener('click', ()=>{
+    document.getElementById('skinFileInput').click();
+  });
+
+  document.getElementById('skinFileInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    document.getElementById('skinFileNameDisplay').value = file.name;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      chosenSkinBase64 = reader.result.split(',')[1]; // strip the data: URL prefix
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('uploadSkinBtn').addEventListener('click', async ()=>{
+    const statusEl = document.getElementById('skinStatus');
+    const account = await window.api.getAccount();
+    if(!account){
+      statusEl.textContent = 'Sign in with Microsoft first (top-right corner).';
+      return;
+    }
+    if(!chosenSkinBase64){
+      statusEl.textContent = 'Choose a PNG skin file first.';
+      return;
+    }
+    statusEl.textContent = 'Uploading to Mojang…';
+    try{
+      await window.api.uploadSkin(chosenSkinBase64, skinVariant);
+      statusEl.textContent = 'Skin updated! It may take a minute to show up everywhere.';
+      const img = document.getElementById('skinPreviewImg');
+      img.src = `https://minotar.net/armor/body/${encodeURIComponent(account.username)}/220.png?cachebust=${Date.now()}`;
+    }catch(err){
+      statusEl.textContent = 'Error: ' + err.message;
+    }
+  });
+
+  async function refreshSkinPreview(){
+    const account = await window.api.getAccount();
+    const img = document.getElementById('skinPreviewImg');
+    const label = document.getElementById('skinPreviewLabel');
+    if(account){
+      img.src = `https://minotar.net/armor/body/${encodeURIComponent(account.username)}/220.png`;
+      label.textContent = account.username;
+    }
+  }
+  refreshSkinPreview();
+
+  window.api.onLoginWaiting(()=>{
+    loginModal.style.display = 'flex';
+  });
+
+  accountChip.addEventListener('click', async ()=>{
+    if(accountChip.classList.contains('signing-in')) return;
+    accountChip.classList.add('signing-in');
+    unameLabel.textContent = 'Signing in…';
+    try{
+      const account = await window.api.login();
+      updateAccountDisplay(account);
+    }catch(err){
+      unameLabel.textContent = 'Sign in with Microsoft';
+      alert('Sign-in failed: ' + err.message);
+    }
+    loginModal.style.display = 'none';
+    accountChip.classList.remove('signing-in');
+  });
+
+  // Restore a previous session if main.js still has one in memory
+  (async ()=>{
+    const account = await window.api.getAccount();
+    if(account) updateAccountDisplay(account);
+  })();
+</script>
+
+
+</body>
+</html>

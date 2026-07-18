@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lethal Client</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{
+    width:100%; height:100%;
+    background:#0d1013;
+    overflow:hidden;
+    font-family:'JetBrains Mono', monospace;
+  }
+
+  #splash{
+    width:100%; height:100%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:22px;
+    background:
+      radial-gradient(ellipse at 50% 30%, rgba(255,157,61,0.08), transparent 60%),
+      linear-gradient(180deg, #12161a 0%, #0d1013 100%);
+    -webkit-app-region: drag;
+  }
+
+  .brandmark{
+    width:64px; height:64px;
+    background:linear-gradient(135deg, #ff9d3d 0%, #b3661f 100%);
+    border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Press Start 2P';
+    font-size:22px;
+    color:#1a1200;
+    box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 8px 24px rgba(255,157,61,.3);
+    animation: pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ transform:scale(1); }
+    50%{ transform:scale(1.06); }
+  }
+
+  .title{
+    font-family:'Press Start 2P';
+    font-size:13px;
+    color:#e9e6dd;
+    letter-spacing:1px;
+  }
+
+  .barwrap{
+    width:220px; height:5px; border-radius:3px;
+    background:#1d2226;
+    overflow:hidden;
+    position:relative;
+  }
+  .barfill{
+    position:absolute; left:0; top:0; bottom:0;
+    width:35%;
+    background:linear-gradient(90deg, #b3661f, #ff9d3d);
+    border-radius:3px;
+    animation: sweep 1.3s ease-in-out infinite;
+  }
+  @keyframes sweep{
+    0%{ left:-40%; width:35%; }
+    50%{ width:55%; }
+    100%{ left:100%; width:35%; }
+  }
+
+  #statusline{
+    font-size:11.5px;
+    color:#8b9299;
+    letter-spacing:.5px;
+    min-height:16px;
+  }
+</style>
+</head>
+<body>
+  <div id="splash">
+    <div class="brandmark">LC</div>
+    <div class="title">LETHAL CLIENT</div>
+    <div class="barwrap"><div class="barfill"></div></div>
+    <div id="statusline">Loading files…</div>
+  </div>
+
+<script>
+  const messages = [
+    'Loading files…',
+    'Checking for updates…',
+    'Preparing mods engine…',
+    'Warming up the JVM bridge…',
+    'Reading configuration…',
+    'Almost there…'
+  ];
+  let i = 0;
+  const statusEl = document.getElementById('statusline');
+  setInterval(()=>{
+    i = (i + 1) % messages.length;
+    statusEl.textContent = messages[i];
+  }, 480);
+</script>
+</body>
+</html>
