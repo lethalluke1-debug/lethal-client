@@ -593,25 +593,6 @@
     padding:14px; text-align:center; color:var(--ember); margin-bottom:14px;
   }
   .loginhint{ font-size:11px; font-style:italic; color:#5f6a71; }
-
-  .update-banner{
-    position:relative; z-index:60;
-    display:flex; align-items:center; gap:14px;
-    background:rgba(255,157,61,.12); border-bottom:1px solid var(--ember-dim);
-    padding:10px 20px; font-size:13px; color:var(--text);
-  }
-  .update-banner button{
-    padding:6px 14px; border-radius:7px; font-size:12.5px; font-weight:500; cursor:pointer;
-  }
-  #restartToUpdateBtn{
-    background:linear-gradient(180deg, var(--ember), var(--ember-dim));
-    border:none; color:#1a1200;
-  }
-  .update-dismiss{
-    margin-left:auto; background:none; border:none; color:var(--muted);
-    font-size:16px; width:26px; height:26px; padding:0;
-  }
-  .update-dismiss:hover{ color:var(--text); }
 </style>
 </head>
 <body>
@@ -683,10 +664,13 @@
       </div>
     </div>
 
-    <div id="updateBanner" class="update-banner" style="display:none;">
-      <span>A new version has downloaded and is ready to install.</span>
-      <button id="restartToUpdateBtn">Restart now</button>
-      <button id="dismissUpdateBtn" class="update-dismiss" title="Later">×</button>
+    <div id="updateModal" class="loginmodal-backdrop" style="display:none;">
+      <div class="loginmodal">
+        <div class="eyebrow">// update available</div>
+        <h3>A new version is ready</h3>
+        <p>Lethal Client needs to restart to finish installing the update. This only takes a few seconds — Minecraft itself won't be affected if it's already running.</p>
+        <button id="restartToUpdateBtn" class="hero-playbtn" style="margin-top:16px; width:100%; justify-content:center;">Restart now</button>
+      </div>
     </div>
 
     <div id="content">
@@ -1508,13 +1492,10 @@
   });
 
   window.api.onUpdateReady(()=>{
-    document.getElementById('updateBanner').style.display = 'flex';
+    document.getElementById('updateModal').style.display = 'flex';
   });
   document.getElementById('restartToUpdateBtn').addEventListener('click', ()=>{
     window.api.restartToUpdate();
-  });
-  document.getElementById('dismissUpdateBtn').addEventListener('click', ()=>{
-    document.getElementById('updateBanner').style.display = 'none';
   });
 
   document.getElementById('heroPlayBtn').addEventListener('click', ()=>{
