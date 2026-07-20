@@ -632,6 +632,7 @@
   .loginmodal{
     width:380px; background:var(--stone); border:1px solid var(--line);
     border-radius:12px; padding:26px 28px;
+    position:relative;
   }
   .loginmodal h3{ font-size:16px; margin:6px 0 12px; word-break:break-all; }
   .loginmodal p{ font-size:12.5px; color:var(--muted); margin-bottom:10px; }
@@ -736,6 +737,22 @@
         <h3>Continue in your browser</h3>
         <p>A Microsoft sign-in page just opened in your default browser. Sign in there with your Minecraft-owning account.</p>
         <p class="loginhint">This window closes automatically once you finish over there.</p>
+      </div>
+    </div>
+
+    <div id="packDetailModal" class="loginmodal-backdrop" style="display:none;">
+      <div class="loginmodal" style="width:460px; max-height:80vh; overflow-y:auto;">
+        <button id="packDetailCloseBtn" style="position:absolute; top:16px; right:16px; background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer;">×</button>
+        <div style="display:flex; gap:16px; align-items:center; margin-bottom:16px;">
+          <img id="packDetailSkin" src="" alt="" style="height:90px; image-rendering:pixelated;">
+          <div>
+            <h3 id="packDetailName" style="font-size:17px;"></h3>
+            <div class="serversub" id="packDetailOwner"></div>
+          </div>
+        </div>
+        <div class="fieldlabel">Mods in this pack</div>
+        <div id="packDetailMods" style="display:flex; flex-direction:column; gap:8px; margin:8px 0 18px;"></div>
+        <button id="packDetailSelectBtn" class="installbtn" style="width:100%;"></button>
       </div>
     </div>
 
@@ -927,6 +944,7 @@
           <div class="addserver-row" style="margin-bottom:16px;">
             <input type="text" id="browsePackSearch" placeholder="Search everyone's modpacks by name…">
             <button id="browsePackSearchBtn">Search</button>
+            <button id="browsePackRefreshBtn" title="Refresh">⟳</button>
           </div>
           <div id="browsePackResults"></div>
         </div>
@@ -1651,6 +1669,7 @@
         chosenModpack = pack;
         document.getElementById('modpackPickerLabel').textContent = pack._label;
         document.getElementById('modpackPickerList').classList.remove('open');
+        document.getElementById('modpackModeSubline').textContent = pack.name;
       });
       listEl.appendChild(item);
     });
@@ -1962,6 +1981,45 @@
   });
 
   // ---------- Browse everyone's modpacks ----------
+  function removeSelectedPack(id){
+    const packs = getSelectedPacks().filter(p=>p.id !== id);
+    localStorage.setItem(SELECTED_PACKS_KEY, JSON.stringify(packs));
+  }
+
+  function openPackDetailModal(pack){
+    const modal = document.getElementById('packDetailModal');
+    document.getElementById('packDetailName').textContent = pack.name;
+    document.getElementById('packDetailOwner').textContent = `by ${pack.owner_username}`;
+    document.getElementById('packDetailSkin').src = `https://minotar.net/armor/body/${encodeURIComponent(pack.owner_username)}/200.png`;
+
+    const listEl = document.getElementById('packDetailMods');
+    listEl.innerHTML = pack.mods.length
+      ? pack.mods.map(m=>`
+          <div class="modcard2">
+            <div class="modicon" style="background:${m.color || '#8b9299'}">${m.title ? m.title[0].toUpperCase() : '?'}</div>
+            <div class="modmeta"><div class="toprow"><h4>${m.title}</h4></div><div class="subline">by ${m.author || 'unknown'}</div></div>
+          </div>`).join('')
+      : `<div style="color:var(--muted); font-size:12.5px;">No mods in this pack.</div>`;
+
+    const alreadySelected = getSelectedPacks().some(p=>p.id === pack.id);
+    const selectBtn = document.getElementById('packDetailSelectBtn');
+    selectBtn.textContent = alreadySelected ? 'Selected for Play — click to remove' : 'Select for Play';
+    selectBtn.classList.toggle('installed', alreadySelected);
+    selectBtn.onclick = ()=>{
+      const nowSelected = getSelectedPacks().some(p=>p.id === pack.id);
+      if(nowSelected){ removeSelectedPack(pack.id); }
+      else{ addSelectedPack(pack); }
+      refreshModpackDropdown();
+      openPackDetailModal(pack); // refresh button state in place
+      searchPublicPacks(); // refresh card button states in the list behind it
+    };
+
+    modal.style.display = 'flex';
+  }
+  document.getElementById('packDetailCloseBtn').addEventListener('click', ()=>{
+    document.getElementById('packDetailModal').style.display = 'none';
+  });
+
   async function searchPublicPacks(){
     const query = document.getElementById('browsePackSearch').value.trim();
     const resultsEl = document.getElementById('browsePackResults');
@@ -1978,6 +2036,7 @@
       rows.forEach(pack=>{
         const card = document.createElement('div');
         card.className = 'packcard';
+        card.style.cursor = 'pointer';
         const alreadySelected = getSelectedPacks().some(p=>p.id === pack.id);
         card.innerHTML = `
           <div class="packtop">
@@ -1987,11 +2046,20 @@
           <div class="packmods">${pack.mods.map(m=>m.title).join(', ') || 'No mods listed'}</div>
           <button class="installbtn ${alreadySelected ? 'installed' : ''}">${alreadySelected ? 'Selected for Play' : 'Select for Play'}</button>
         `;
+        card.addEventListener('click', ()=> openPackDetailModal(pack));
         card.querySelector('.installbtn').addEventListener('click', (e)=>{
+          e.stopPropagation(); // don't also open the detail modal
           const btn = e.target;
-          addSelectedPack(pack);
-          btn.textContent = 'Selected for Play';
-          btn.classList.add('installed');
+          const nowSelected = getSelectedPacks().some(p=>p.id === pack.id);
+          if(nowSelected){
+            removeSelectedPack(pack.id);
+            btn.textContent = 'Select for Play';
+            btn.classList.remove('installed');
+          } else {
+            addSelectedPack(pack);
+            btn.textContent = 'Selected for Play';
+            btn.classList.add('installed');
+          }
           refreshModpackDropdown();
         });
         resultsEl.appendChild(card);
@@ -2001,6 +2069,7 @@
     }
   }
   document.getElementById('browsePackSearchBtn').addEventListener('click', searchPublicPacks);
+  document.getElementById('browsePackRefreshBtn').addEventListener('click', searchPublicPacks);
   document.getElementById('browsePackSearch').addEventListener('keydown', (e)=>{
     if(e.key === 'Enter') searchPublicPacks();
   });
