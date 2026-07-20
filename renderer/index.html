@@ -641,6 +641,19 @@
     padding:14px; text-align:center; color:var(--ember); margin-bottom:14px;
   }
   .loginhint{ font-size:11px; font-style:italic; color:#5f6a71; }
+
+  .modpack-empty{ text-align:center; padding:30px 0; }
+  .btn-secondary-inline{
+    padding:9px 16px; border-radius:8px; background:var(--panel); border:1px solid var(--line);
+    color:var(--text); font-size:12.5px; cursor:pointer;
+  }
+  .btn-secondary-inline:hover{ border-color:var(--ember-dim); }
+  .btn-danger-inline{
+    padding:9px 16px; border-radius:8px; background:rgba(217,90,90,.1); border:1px solid #d95a5a;
+    color:#d95a5a; font-size:12.5px; cursor:pointer;
+  }
+  .btn-danger-inline:hover{ background:rgba(217,90,90,.2); }
+  .modpack-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
 </style>
 </head>
 <body>
@@ -661,6 +674,10 @@
     <div class="navitem" data-tip="Cosmetics" data-page="cosmetics">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2s-4 3-4 7a4 4 0 008 0c0-4-4-7-4-7z"/><path d="M6 13c0 5 2.5 9 6 9s6-4 6-9"/></svg>
       <span class="tip">Cosmetics</span>
+    </div>
+    <div class="navitem" data-tip="Modpack" data-page="modpack">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="tip">Modpack</span>
     </div>
     <div class="navitem disabled" data-tip="Coming soon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 14h16"/><path d="M9 4v6"/></svg>
@@ -844,6 +861,49 @@
             </div>
             <div class="cosmetic-grid" id="cosmeticGrid"></div>
           </div>
+        </div>
+      </div>
+
+      <div id="modpackPage" class="page" data-pageid="modpack">
+        <div class="eyebrow">// your modpack</div>
+        <div class="hero" style="font-size:16px;">MY MODPACK</div>
+        <p style="color:var(--muted); font-size:13px; max-width:520px; margin-bottom:20px;">
+          You get one modpack. Import your currently-installed mods into it, or search Modrinth
+          directly to add anything to it. Sharing/browsing other people's modpacks needs a real
+          hosted backend that doesn't exist yet — this part is just yours, saved on this device.
+        </p>
+
+        <div id="noPackView">
+          <div class="modpack-empty">
+            <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">You haven't created a modpack yet.</p>
+            <div class="addserver-row" style="max-width:360px; margin:0 auto 12px;">
+              <input type="text" id="packNameInput" placeholder="Name your modpack">
+              <button id="createPackBtn">Create</button>
+            </div>
+            <button id="importCurrentModsBtn" class="btn-secondary-inline">Or import your currently-installed mods</button>
+          </div>
+        </div>
+
+        <div id="hasPackView" style="display:none;">
+          <div class="modpack-header">
+            <div>
+              <h3 id="packNameDisplay" style="font-size:16px;"></h3>
+              <div class="serversub" id="packCountDisplay"></div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button id="importIntoPackBtn" class="btn-secondary-inline">Import installed mods</button>
+              <button id="deletePackBtn" class="btn-danger-inline">Delete modpack</button>
+            </div>
+          </div>
+
+          <div class="modlist" id="packModList" style="margin-bottom:24px;"></div>
+
+          <span class="fieldlabel">Search Modrinth to add mods</span>
+          <div class="addserver-row" style="margin-bottom:14px;">
+            <input type="text" id="modrinthSearchInput" placeholder="Search any mod on Modrinth…">
+            <button id="modrinthSearchBtn">Search</button>
+          </div>
+          <div class="modlist" id="modrinthSearchResults"></div>
         </div>
       </div>
 
@@ -1581,6 +1641,128 @@
   document.getElementById('winMinimize').addEventListener('click', ()=> window.api.minimizeWindow());
   document.getElementById('winMaximize').addEventListener('click', ()=> window.api.maximizeWindow());
   document.getElementById('winClose').addEventListener('click', ()=> window.api.closeWindow());
+
+  // ---------- Modpack (yours only — sharing needs a real backend, not built yet) ----------
+  const PACK_KEY = 'lethal-my-modpack';
+  const noPackView = document.getElementById('noPackView');
+  const hasPackView = document.getElementById('hasPackView');
+
+  function loadPack(){
+    try{ return JSON.parse(localStorage.getItem(PACK_KEY)); }catch{ return null; }
+  }
+  function savePack(pack){ localStorage.setItem(PACK_KEY, JSON.stringify(pack)); }
+
+  function renderPackView(){
+    const pack = loadPack();
+    if(!pack){
+      noPackView.style.display = 'block';
+      hasPackView.style.display = 'none';
+      return;
+    }
+    noPackView.style.display = 'none';
+    hasPackView.style.display = 'block';
+    document.getElementById('packNameDisplay').textContent = pack.name;
+    document.getElementById('packCountDisplay').textContent =
+      `${pack.mods.length} mod${pack.mods.length === 1 ? '' : 's'} in this pack`;
+
+    const listEl = document.getElementById('packModList');
+    listEl.innerHTML = '';
+    pack.mods.forEach((mod, idx)=>{
+      const row = document.createElement('div');
+      row.className = 'modcard2';
+      row.innerHTML = `
+        <div class="modicon" style="background:${mod.color || '#8b9299'}">${mod.title ? mod.title[0].toUpperCase() : '?'}</div>
+        <div class="modmeta">
+          <div class="toprow"><h4>${mod.title}</h4></div>
+          <div class="subline">by ${mod.author || 'unknown'}</div>
+        </div>
+        <button class="serverremove" title="Remove from pack">×</button>
+      `;
+      row.querySelector('.serverremove').addEventListener('click', ()=>{
+        pack.mods.splice(idx, 1);
+        savePack(pack);
+        renderPackView();
+      });
+      listEl.appendChild(row);
+    });
+  }
+
+  document.getElementById('createPackBtn').addEventListener('click', ()=>{
+    const name = document.getElementById('packNameInput').value.trim();
+    if(!name) return;
+    savePack({ name, mods: [] });
+    renderPackView();
+  });
+
+  document.getElementById('importCurrentModsBtn').addEventListener('click', ()=>{
+    const name = prompt('Name your modpack:');
+    if(!name) return;
+    const installed = modsCatalog.filter(m=>m.installed).map(m=>({
+      id: m.id, title: m.name, author: m.author, color: m.color,
+    }));
+    savePack({ name, mods: installed });
+    renderPackView();
+  });
+
+  document.getElementById('importIntoPackBtn').addEventListener('click', ()=>{
+    const pack = loadPack();
+    if(!pack) return;
+    const existingIds = new Set(pack.mods.map(m=>m.id).filter(Boolean));
+    modsCatalog.filter(m=>m.installed && !existingIds.has(m.id)).forEach(m=>{
+      pack.mods.push({ id: m.id, title: m.name, author: m.author, color: m.color });
+    });
+    savePack(pack);
+    renderPackView();
+  });
+
+  document.getElementById('deletePackBtn').addEventListener('click', ()=>{
+    if(!confirm('Delete your modpack? This only removes the pack list, not any mods you already have installed.')) return;
+    localStorage.removeItem(PACK_KEY);
+    renderPackView();
+  });
+
+  document.getElementById('modrinthSearchBtn').addEventListener('click', async ()=>{
+    const query = document.getElementById('modrinthSearchInput').value.trim();
+    const resultsEl = document.getElementById('modrinthSearchResults');
+    if(!query){ resultsEl.innerHTML = ''; return; }
+    resultsEl.innerHTML = `<div style="color:var(--muted); font-size:12.5px; padding:10px 0;">Searching Modrinth…</div>`;
+    try{
+      const facets = encodeURIComponent('[["project_type:mod"],["categories:fabric"]]');
+      const res = await fetch(`https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&facets=${facets}&limit=12`);
+      const data = await res.json();
+      resultsEl.innerHTML = '';
+      data.hits.forEach(hit=>{
+        const row = document.createElement('div');
+        row.className = 'modcard2';
+        row.innerHTML = `
+          <div class="modicon" style="background-image:url(${hit.icon_url || ''}); background-size:cover; background-color:#8b9299;"></div>
+          <div class="modmeta">
+            <div class="toprow"><h4>${hit.title}</h4></div>
+            <p>${hit.description || ''}</p>
+            <div class="subline">by ${hit.author}</div>
+          </div>
+          <button class="installbtn">Add to pack</button>
+        `;
+        row.querySelector('.installbtn').addEventListener('click', ()=>{
+          const pack = loadPack();
+          if(!pack){ alert('Create a modpack first.'); return; }
+          if(pack.mods.some(m=>m.slug === hit.slug)) return; // already added
+          pack.mods.push({ slug: hit.slug, title: hit.title, author: hit.author, color: '#8b9299' });
+          savePack(pack);
+          renderPackView();
+        });
+        resultsEl.appendChild(row);
+      });
+      if(!data.hits.length) resultsEl.innerHTML = `<div style="color:var(--muted); font-size:12.5px; padding:10px 0;">No results.</div>`;
+    }catch(err){
+      resultsEl.innerHTML = `<div style="color:#d95a5a; font-size:12.5px; padding:10px 0;">Search failed: ${err.message}</div>`;
+    }
+  });
+  document.getElementById('modrinthSearchInput').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') document.getElementById('modrinthSearchBtn').click();
+  });
+
+  renderPackView();
 
   // ---------- Skins (real Mojang skin upload) ----------
   document.getElementById('checkUpdatesBtn').addEventListener('click', async ()=>{
