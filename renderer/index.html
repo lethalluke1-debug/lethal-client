@@ -1016,6 +1016,18 @@
             <span class="modebtn-title">With Mods</span>
             <span class="modebtn-sub" id="modsSubline">0 installed mods</span>
           </button>
+          <button class="modebtn" data-mode="modpack">
+            <span class="modebtn-title">Modpack</span>
+            <span class="modebtn-sub" id="modpackModeSubline">Pick a pack below</span>
+          </button>
+        </div>
+
+        <div class="versionpicker" id="modpackPicker" style="display:none;">
+          <div class="select" id="modpackPickerSelect">
+            <span id="modpackPickerLabel">Choose a modpack…</span>
+            <span>▾</span>
+          </div>
+          <div class="selectlist" id="modpackPickerList"></div>
         </div>
 
         <div class="spacer"></div>
@@ -1603,7 +1615,52 @@
     playMode = btn.getAttribute('data-mode');
     document.querySelectorAll('.modebtn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
+    document.getElementById('modpackPicker').style.display = playMode === 'modpack' ? 'block' : 'none';
+    if(playMode === 'modpack') refreshModpackDropdown();
   });
+
+  // ---------- Modpack picker (for the 'Modpack' play mode) ----------
+  const SELECTED_PACKS_KEY = 'lethal-selected-packs';
+  let chosenModpack = null; // the actual pack object currently picked in the dropdown
+
+  function getSelectedPacks(){
+    try{ return JSON.parse(localStorage.getItem(SELECTED_PACKS_KEY) || '[]'); }catch{ return []; }
+  }
+  function addSelectedPack(pack){
+    const packs = getSelectedPacks().filter(p=>p.id !== pack.id);
+    packs.push(pack);
+    localStorage.setItem(SELECTED_PACKS_KEY, JSON.stringify(packs));
+  }
+
+  function refreshModpackDropdown(){
+    const listEl = document.getElementById('modpackPickerList');
+    listEl.innerHTML = '';
+    const options = [];
+    if(myPack) options.push({ ...myPack, _label: `${myPack.name} (yours)` });
+    getSelectedPacks().forEach(p=> options.push({ ...p, _label: p.name }));
+
+    if(!options.length){
+      listEl.innerHTML = `<div class="selectitem" style="color:var(--muted); cursor:default;">No modpacks yet — create one or select one from Browse Modpacks</div>`;
+      return;
+    }
+    options.forEach(pack=>{
+      const item = document.createElement('div');
+      item.className = 'selectitem';
+      item.textContent = pack._label;
+      item.addEventListener('click', ()=>{
+        chosenModpack = pack;
+        document.getElementById('modpackPickerLabel').textContent = pack._label;
+        document.getElementById('modpackPickerList').classList.remove('open');
+      });
+      listEl.appendChild(item);
+    });
+  }
+
+  document.getElementById('modpackPickerSelect').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    document.getElementById('modpackPickerList').classList.toggle('open');
+  });
+  document.addEventListener('click', ()=> document.getElementById('modpackPickerList').classList.remove('open'));
 
   // keep the "With Mods" subline in sync whenever the mod list re-renders
   const _renderMods = renderMods;
@@ -1652,11 +1709,30 @@
     document.getElementById('versionPicker').classList.add('locked');
     document.getElementById('modeChoice').classList.add('locked');
 
-    const activeMods = compatibleInstalledMods();
-    const withMods = playMode === 'mods' && activeMods.length > 0;
+    let launchModIds = [];
+    let withMods = false;
+
+    if(playMode === 'mods'){
+      const activeMods = compatibleInstalledMods();
+      launchModIds = activeMods.map(m=>m.id);
+      withMods = activeMods.length > 0;
+    } else if(playMode === 'modpack'){
+      if(!chosenModpack){
+        alert('Pick a modpack from the dropdown first.');
+        playbtn.classList.remove('launching');
+        playlabel.textContent = 'PLAY';
+        barwrap.classList.remove('show');
+        document.getElementById('versionPicker').classList.remove('locked');
+        document.getElementById('modeChoice').classList.remove('locked');
+        return;
+      }
+      launchModIds = chosenModpack.mods.map(m=>m.id);
+      withMods = launchModIds.length > 0;
+      status.textContent = `Installing "${chosenModpack.name}"…`;
+    }
 
     try{
-      const result = await window.api.launchGame(currentVersion, withMods, activeMods.map(m=>m.id));
+      const result = await window.api.launchGame(currentVersion, withMods, launchModIds);
       if(result && result.cancelled){
         status.textContent = 'Launch cancelled.';
       } else {
@@ -1902,23 +1978,21 @@
       rows.forEach(pack=>{
         const card = document.createElement('div');
         card.className = 'packcard';
+        const alreadySelected = getSelectedPacks().some(p=>p.id === pack.id);
         card.innerHTML = `
           <div class="packtop">
             <h4>${pack.name}</h4>
             <span class="packowner">by ${pack.owner_username}</span>
           </div>
           <div class="packmods">${pack.mods.map(m=>m.title).join(', ') || 'No mods listed'}</div>
-          <button class="installbtn">Install this pack</button>
+          <button class="installbtn ${alreadySelected ? 'installed' : ''}">${alreadySelected ? 'Selected for Play' : 'Select for Play'}</button>
         `;
-        card.querySelector('.installbtn').addEventListener('click', async (e)=>{
+        card.querySelector('.installbtn').addEventListener('click', (e)=>{
           const btn = e.target;
-          btn.disabled = true;
-          btn.textContent = 'Installing…';
-          for(const mod of pack.mods){
-            try{ await window.api.installMod(mod.id, currentVersion); }catch(err){ console.error(err); }
-          }
-          btn.textContent = 'Installed';
-          await syncModsFromManifest();
+          addSelectedPack(pack);
+          btn.textContent = 'Selected for Play';
+          btn.classList.add('installed');
+          refreshModpackDropdown();
         });
         resultsEl.appendChild(card);
       });
