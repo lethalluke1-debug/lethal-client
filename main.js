@@ -314,6 +314,7 @@ ipcMain.handle('launch-game', async (event, { version, withMods, modIds }) => {
       version,
       withMods,
       modIds,
+      knownFiles: loadManifest(version), // modId -> filename, so already-installed mods skip re-checking
       ramGB: config.ramGB || 4,
       account,
       cacheDir: CACHE_DIR,

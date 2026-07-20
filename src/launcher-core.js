@@ -12,6 +12,9 @@ const { withConcurrency } = require('./download');
  * @param {string} opts.version - e.g. "26.2"
  * @param {boolean} opts.withMods
  * @param {string[]} opts.modIds - keys from modrinth.CURATED_MODS the user has "installed"
+ * @param {object} [opts.knownFiles] - modId -> filename, from the manifest. Mods already
+ *   confirmed present on disk skip the Modrinth lookup entirely instead of re-checking
+ *   every single launch.
  * @param {number} opts.ramGB
  * @param {object} opts.account - { username, uuid, minecraftAccessToken } from msauth
  * @param {string} opts.cacheDir - shared cache for vanilla client/libraries/assets (same across versions)
@@ -21,7 +24,7 @@ const { withConcurrency } = require('./download');
  * @param {AbortSignal} [opts.signal] - lets the whole download/install process be cancelled
  */
 async function launch(opts) {
-  const { version, withMods, modIds, ramGB, account, cacheDir, gameDir, onStatus, signal } = opts;
+  const { version, withMods, modIds, knownFiles = {}, ramGB, account, cacheDir, gameDir, onStatus, signal } = opts;
 
   if (!account?.minecraftAccessToken) {
     throw new Error('You need to sign in with Microsoft before you can launch.');
@@ -37,10 +40,18 @@ async function launch(opts) {
   fs.mkdirSync(modsDir, { recursive: true });
 
   if (withMods && modIds.length) {
-    onStatus(`Installing ${modIds.length} mod${modIds.length === 1 ? '' : 's'}…`);
+    const alreadyKnown = modIds.filter((id) => {
+      const f = knownFiles[id];
+      return f && fs.existsSync(path.join(modsDir, f));
+    });
+    const needsCheck = modIds.length - alreadyKnown.length;
+    onStatus(needsCheck > 0
+      ? `Checking ${needsCheck} mod${needsCheck === 1 ? '' : 's'}… (${alreadyKnown.length} already ready)`
+      : `All ${modIds.length} mod${modIds.length === 1 ? '' : 's'} already installed — skipping straight to launch.`
+    );
     const sharedVisited = new Set(); // a dependency like Fabric API only gets resolved once, not once per mod
     await withConcurrency(modIds, 4, (modId) =>
-      modrinth.downloadMod(modId, version, modsDir, onStatus, sharedVisited, [], signal)
+      modrinth.downloadMod(modId, version, modsDir, onStatus, sharedVisited, [], signal, knownFiles)
     );
   }
 

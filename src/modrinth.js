@@ -14,11 +14,11 @@ const CURATED_MODS = {
   'sodium-extra': 'sodium-extra',
   'reeses-sodium-options': 'reeses-sodium-options',
   lithium: 'lithium',
-  ferritecore: 'ferritecore',
+  ferritecore: 'ferrite-core',
   immediatelyfast: 'immediatelyfast',
   'dynamic-fps': 'dynamic-fps',
   entityculling: 'entityculling',
-  'low-fire': 'low-fire',
+  'low-fire': 'low-fire-reborn',
   'marlows-crystal-optimizer': 'marlow-crystal-optimizer',
   'heros-anchor-optimizer': 'anchor',
   'fabric-api': 'fabric-api',
@@ -31,7 +31,7 @@ const CURATED_MODS = {
   yacl: 'yacl',
   jade: 'jade',
   litematica: 'litematica',
-  'map-tooltip': 'maptooltip',
+  'map-tooltip': 'map-tooltip',
   shulkerboxtooltip: 'shulkerboxtooltip',
   svc: 'simple-voice-chat',
   flashback: 'flashback',
@@ -39,7 +39,6 @@ const CURATED_MODS = {
   whoami: 'whoami',
   'map-in-slot': 'map-in-slot',
   modmenu: 'modmenu',
-  'small-shield-totem': 'small-shield-and-totem',
   fullbright: 'fullbright',
   freelook: 'freelook',
   'ukus-armor-hud': 'ukus-armor-hud',
@@ -71,10 +70,23 @@ async function resolveProjectSlug(projectId, signal) {
  * `visited` prevents re-downloading the same dependency twice in one pass,
  * or looping forever if two mods depend on each other.
  */
-async function downloadMod(modId, gameVersion, modsDir, onStatus, visited = new Set(), dependencyResults = [], signal) {
+async function downloadMod(modId, gameVersion, modsDir, onStatus, visited = new Set(), dependencyResults = [], signal, knownFiles = {}) {
   const slug = CURATED_MODS[modId] || modId;
   if (visited.has(slug)) return null; // already handled earlier in this same install pass
   visited.add(slug);
+
+  // Fast path: if we already know (from a previous install, recorded in the
+  // manifest) exactly which file this mod is, and it's genuinely still
+  // sitting on disk, skip the Modrinth lookup entirely — no network call,
+  // no waiting. This is what makes launching with the same mods repeatedly
+  // fast instead of re-checking Modrinth every single time.
+  const knownFilename = knownFiles[modId];
+  if (knownFilename) {
+    const knownPath = path.join(modsDir, knownFilename);
+    if (fs.existsSync(knownPath)) {
+      return { filename: knownFilename, versionNumber: null };
+    }
+  }
 
   onStatus?.(`Looking up ${slug} on Modrinth…`);
   const version = await getBestVersion(slug, gameVersion, 'fabric', signal);
@@ -97,7 +109,7 @@ async function downloadMod(modId, gameVersion, modsDir, onStatus, visited = new 
     try {
       const depSlug = await resolveProjectSlug(dep.project_id, signal);
       onStatus?.(`${slug} needs ${depSlug} — installing that too…`);
-      const depResult = await downloadMod(depSlug, gameVersion, modsDir, onStatus, visited, dependencyResults, signal);
+      const depResult = await downloadMod(depSlug, gameVersion, modsDir, onStatus, visited, dependencyResults, signal, knownFiles);
       if (depResult) dependencyResults.push({ modId: depSlug, ...depResult });
     } catch (err) {
       onStatus?.(`Couldn't auto-install a dependency for ${slug}: ${err.message}`);

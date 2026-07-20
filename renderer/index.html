@@ -562,6 +562,24 @@
   .installbtn.installed .ibtxt::before{ content:'Installed'; font-size:12.5px; }
   .installbtn.installing{ pointer-events:none; color:var(--muted); }
 
+  .modtoggle{ flex-shrink:0; cursor:pointer; position:relative; }
+  .modtoggle input{ position:absolute; opacity:0; width:0; height:0; }
+  .modtoggle .toggle-track{
+    display:block; width:42px; height:24px; border-radius:12px;
+    background:var(--panel-hi); border:1px solid var(--line);
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .modtoggle .toggle-thumb{
+    display:block; width:16px; height:16px; border-radius:50%;
+    background:var(--muted); margin:3px;
+    transition:transform .15s ease, background .15s ease;
+  }
+  .modtoggle.on .toggle-track{ background:rgba(255,157,61,.18); border-color:var(--ember); }
+  .modtoggle.on .toggle-thumb{ background:var(--ember); transform:translateX(18px); }
+  .modtoggle.installing{ pointer-events:none; opacity:.6; }
+  .modtoggle.installing .toggle-thumb{ animation:togglePulse .8s ease-in-out infinite; }
+  @keyframes togglePulse{ 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
+
   .wincontrols{
     display:flex; align-items:center;
     -webkit-app-region:no-drag;
@@ -1152,7 +1170,6 @@
     { id:'whoami', name:'WhoAmI', cat:'utility', color:'#8b9299', size:'0.01 MB', author:'Earthcomputer', desc:'Small debug/utility mod, tiny footprint.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
     { id:'map-in-slot', name:'Map in Slot', cat:'cosmetic', color:'#4f8fd6', size:'0.02 MB', author:'community', desc:'Renders a mini map preview directly in the item slot icon.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
     { id:'modmenu', name:'Mod Menu', cat:'utility', color:'#4f8fd6', size:'1.1 MB', author:'TerraformersMC', desc:'Adds an in-game screen listing and configuring your mods.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11','1.21.10','1.21.9'] },
-    { id:'small-shield-totem', name:'Small Shield & Totem', cat:'cosmetic', color:'#4f8fd6', size:'0.02 MB', author:'blobh', desc:'Shrinks the oversized shield and totem-of-undying overlays.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
     { id:'fullbright', name:'Fullbright', cat:'cosmetic', color:'#d9b23c', size:'0.02 MB', author:'community', desc:'Lets you see clearly in the dark without changing gamma files.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
     { id:'freelook', name:'Freelook', cat:'cosmetic', color:'#7c5cb3', size:'0.04 MB', author:'tudou', desc:'Look around independently of your movement direction with a keybind.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
     { id:'ukus-armor-hud', name:"UKU's Armor HUD", cat:'cosmetic', color:'#4fd6c4', size:'0.05 MB', author:'community', desc:'Adds a compact armor durability display to the HUD.', installed:false, versions:['26.2','26.1.2','26.1.1','26.1','1.21.11'] },
@@ -1208,10 +1225,11 @@
       const row = document.createElement('div');
       row.className = 'modcard2';
 
-      const actionHtml = `<button class="installbtn ${mod.installed ? 'installed' : ''}" data-id="${mod.id}">
-             <div class="ibar"></div>
-             <span class="ibtxt">${mod.installed ? 'Installed' : 'Install'}</span>
-           </button>`;
+      const actionHtml = `
+        <label class="modtoggle ${mod.installed ? 'on' : ''}" data-id="${mod.id}">
+          <input type="checkbox" ${mod.installed ? 'checked' : ''}>
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>`;
 
       row.innerHTML = `
         <div class="modicon" style="background:${mod.color}">${initials(mod.name)}</div>
@@ -1232,22 +1250,18 @@
     installedCountEl.textContent = installedCount;
     totalCountEl.textContent = modsCatalog.length;
 
-    modListEl.querySelectorAll('.installbtn').forEach(btn=>{
-      btn.addEventListener('click', ()=> handleInstallClick(btn));
+    modListEl.querySelectorAll('.modtoggle').forEach(toggle=>{
+      toggle.querySelector('input').addEventListener('change', ()=> handleInstallClick(toggle));
     });
   }
 
-  async function handleInstallClick(btn){
-    const id = btn.getAttribute('data-id');
+  async function handleInstallClick(toggle){
+    const id = toggle.getAttribute('data-id');
     const mod = modsCatalog.find(m=>m.id === id);
-    if(!mod || btn.classList.contains('installing')) return;
-
-    const ibar = btn.querySelector('.ibar');
-    const ibtxt = btn.querySelector('.ibtxt');
+    if(!mod || toggle.classList.contains('installing')) return;
 
     if(mod.installed){
-      btn.classList.add('installing');
-      ibtxt.textContent = 'Removing…';
+      toggle.classList.add('installing');
       try{
         await window.api.removeMod(mod.id, currentVersion);
         mod.installed = false;
@@ -1259,14 +1273,11 @@
       return;
     }
 
-    btn.classList.add('installing');
-    ibtxt.textContent = 'Installing…';
-    ibar.style.width = '55%'; // real download time is unknown, so this is just an in-progress indicator
+    toggle.classList.add('installing'); // installs silently in the background — no dialog, no waiting for Play
 
     try{
       await window.api.installMod(mod.id, currentVersion);
       mod.installed = true;
-      ibar.style.width = '100%';
     }catch(err){
       alert(`Couldn't install ${mod.name}: ${err.message}`);
     }
