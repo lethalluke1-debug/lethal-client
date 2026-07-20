@@ -1872,6 +1872,16 @@
       bg: '#7c5cb3',
       svg: '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M4 4h16v11l-4 4h-4l-3 3v-3H4z"/><path d="M13 8v4M17 8v4"/></svg>',
     },
+    owner: {
+      tooltip: 'Lethal Client Owner',
+      bg: 'linear-gradient(135deg, var(--ember), var(--ember-dim))',
+      svg: '<svg viewBox="0 0 24 24" fill="white"><path d="M2 18h20l-1.5-9-4 3-4.5-6-4.5 6-4-3z"/></svg>',
+    },
+    og: {
+      tooltip: 'OG — First 3 Players To Use Client',
+      bg: '#d9b23c',
+      svg: '<svg viewBox="0 0 24 24" fill="#1a1200"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8-5.1-4.7 6.9-.8z"/></svg>',
+    },
   };
 
   async function checkAndShowBadge(username){
@@ -1881,7 +1891,7 @@
       const res = await fetch(`${SUPABASE_URL}/rest/v1/badges?username=ilike.${encodeURIComponent(username)}&select=badge_type`, { headers: SUPABASE_HEADERS });
       const rows = await res.json();
       if(!rows.length) return;
-      const info = BADGE_ICONS[rows[0].badge_type];
+      const info = BADGE_ICONS[(rows[0].badge_type || '').toLowerCase().trim()];
       if(!info) return;
       badgeEl.style.background = info.bg;
       badgeEl.innerHTML = info.svg;
