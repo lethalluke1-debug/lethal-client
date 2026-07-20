@@ -701,6 +701,42 @@
   .packcard .packowner{ font-family:'JetBrains Mono'; font-size:11px; color:var(--muted); }
   .packcard .packmods{ font-size:12px; color:var(--muted); margin-top:6px; }
   .packcard .installbtn{ margin-top:10px; }
+
+  .packcard-v2{
+    display:flex; gap:14px; align-items:flex-start;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:16px; margin-bottom:10px; transition:border-color .15s ease;
+  }
+  .packcard-v2:hover{ border-color:var(--ember-dim); }
+  .packicon{ width:56px; height:56px; border-radius:10px; image-rendering:pixelated; flex-shrink:0; }
+  .packbody{ flex:1; min-width:0; }
+  .packtoprow{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .packtoprow h4{ font-size:15px; }
+  .packtoprow .packowner{ font-size:12px; color:var(--muted); }
+  .packdesc{ font-size:12.5px; color:var(--muted); margin:5px 0 8px; line-height:1.5; }
+  .packtags{ display:flex; gap:6px; flex-wrap:wrap; }
+  .packtag{
+    font-family:'JetBrains Mono'; font-size:10.5px; color:var(--muted);
+    border:1px solid var(--line); border-radius:20px; padding:2px 9px;
+  }
+  .packstats{
+    flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:8px;
+  }
+  .packstat{
+    display:flex; align-items:center; gap:5px;
+    font-family:'JetBrains Mono'; font-size:12.5px; color:var(--muted);
+  }
+  .packstat svg{ width:15px; height:15px; }
+  .packlike{
+    display:flex; align-items:center; gap:5px;
+    background:none; border:none; color:var(--muted); cursor:pointer;
+    font-family:'JetBrains Mono'; font-size:12.5px;
+  }
+  .packlike svg{ width:15px; height:15px; }
+  .packlike.liked{ color:#d95a5a; }
+  .packlike:hover{ color:#d95a5a; }
+  .packtime{ font-size:11px; color:#5f6a71; }
+  .packstats .installbtn{ margin-top:0; }
 </style>
 </head>
 <body>
@@ -1825,6 +1861,7 @@
       launchModIds = chosenModpack.mods.map(m=>m.id);
       withMods = launchModIds.length > 0;
       status.textContent = `Installing "${chosenModpack.name}"…`;
+      if(chosenModpack.id) recordPlay(chosenModpack.id); // no-op if this player already has a recorded play
     }
 
     try{
@@ -1927,6 +1964,71 @@
     'Authorization': `Bearer ${SUPABASE_KEY}`,
     'Content-Type': 'application/json',
   };
+
+  async function getExactCount(table, packId){
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?pack_id=eq.${packId}&select=pack_id`, {
+        method: 'HEAD',
+        headers: { ...SUPABASE_HEADERS, 'Prefer': 'count=exact' },
+      });
+      const range = res.headers.get('content-range'); // format: "0-9/23"
+      return range ? parseInt(range.split('/')[1], 10) || 0 : 0;
+    }catch{ return 0; }
+  }
+
+  /** Records a play for this pack — the unique (pack_id, player_uuid)
+   * constraint means replaying the same pack again never counts twice. */
+  async function recordPlay(packId){
+    const account = await window.api.getAccount();
+    if(!account) return;
+    try{
+      await fetch(`${SUPABASE_URL}/rest/v1/modpack_plays`, {
+        method: 'POST',
+        headers: { ...SUPABASE_HEADERS, 'Prefer': 'resolution=ignore-duplicates' },
+        body: JSON.stringify({ pack_id: packId, player_uuid: account.uuid }),
+      });
+    }catch(err){ console.error('Could not record play', err); }
+  }
+
+  async function hasLiked(packId, playerUuid){
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/modpack_likes?pack_id=eq.${packId}&player_uuid=eq.${playerUuid}&select=pack_id`, { headers: SUPABASE_HEADERS });
+      return (await res.json()).length > 0;
+    }catch{ return false; }
+  }
+
+  async function toggleLike(packId){
+    const account = await window.api.getAccount();
+    if(!account){ alert('Sign in with Microsoft first.'); return null; }
+    const already = await hasLiked(packId, account.uuid);
+    try{
+      if(already){
+        await fetch(`${SUPABASE_URL}/rest/v1/modpack_likes?pack_id=eq.${packId}&player_uuid=eq.${account.uuid}`, {
+          method: 'DELETE', headers: SUPABASE_HEADERS,
+        });
+        return false;
+      } else {
+        await fetch(`${SUPABASE_URL}/rest/v1/modpack_likes`, {
+          method: 'POST',
+          headers: { ...SUPABASE_HEADERS, 'Prefer': 'resolution=ignore-duplicates' },
+          body: JSON.stringify({ pack_id: packId, player_uuid: account.uuid }),
+        });
+        return true;
+      }
+    }catch(err){ console.error('Could not toggle like', err); return already; }
+  }
+
+  function timeAgo(dateStr){
+    const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if(seconds < 60) return 'just now';
+    const mins = Math.floor(seconds / 60);
+    if(mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if(hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if(days < 30) return `${days}d ago`;
+    return `${Math.floor(days / 30)}mo ago`;
+  }
 
   document.getElementById('modpackTabs').addEventListener('click', (e)=>{
     const tab = e.target.closest('.tab');
@@ -2160,20 +2262,49 @@
         resultsEl.innerHTML = `<div style="color:var(--muted); font-size:12.5px; padding:10px 0;">No modpacks found.</div>`;
         return;
       }
-      rows.forEach(pack=>{
+      rows.forEach(async (pack)=>{
         const card = document.createElement('div');
-        card.className = 'packcard';
+        card.className = 'packcard-v2';
         card.style.cursor = 'pointer';
         const alreadySelected = getSelectedPacks().some(p=>p.id === pack.id);
+        const account = await window.api.getAccount();
+        const liked = account ? await hasLiked(pack.id, account.uuid) : false;
+        const playCount = await getExactCount('modpack_plays', pack.id);
+        const likeCount = await getExactCount('modpack_likes', pack.id);
+
         card.innerHTML = `
-          <div class="packtop">
-            <h4>${pack.name}</h4>
-            <span class="packowner">by ${pack.owner_username}</span>
+          <img class="packicon" src="https://minotar.net/avatar/${encodeURIComponent(pack.owner_username)}/64.png" alt="">
+          <div class="packbody">
+            <div class="packtoprow">
+              <h4>${pack.name}</h4>
+              <span class="packowner">by ${pack.owner_username}</span>
+            </div>
+            <div class="packdesc">${pack.mods.map(m=>m.title).join(', ') || 'No mods listed'}</div>
+            <div class="packtags">
+              <span class="packtag">${pack.mods.length} mod${pack.mods.length === 1 ? '' : 's'}</span>
+              <span class="packtag">Fabric</span>
+            </div>
           </div>
-          <div class="packmods">${pack.mods.map(m=>m.title).join(', ') || 'No mods listed'}</div>
-          <button class="installbtn ${alreadySelected ? 'installed' : ''}">${alreadySelected ? 'Selected for Play' : 'Select for Play'}</button>
+          <div class="packstats">
+            <div class="packstat" title="Plays"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span class="playcount">${playCount}</span></div>
+            <button class="packlike ${liked ? 'liked' : ''}" title="Like">
+              <svg viewBox="0 0 24 24" fill="${liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 000-7.8z"/></svg>
+              <span class="likecount">${likeCount}</span>
+            </button>
+            <span class="packtime">${timeAgo(pack.updated_at)}</span>
+            <button class="installbtn ${alreadySelected ? 'installed' : ''}">${alreadySelected ? 'Selected for Play' : 'Select for Play'}</button>
+          </div>
         `;
         card.addEventListener('click', ()=> openPackDetailModal(pack));
+        card.querySelector('.packlike').addEventListener('click', async (e)=>{
+          e.stopPropagation();
+          const btn = e.currentTarget;
+          const nowLiked = await toggleLike(pack.id);
+          if(nowLiked === null) return;
+          btn.classList.toggle('liked', nowLiked);
+          btn.querySelector('svg').setAttribute('fill', nowLiked ? 'currentColor' : 'none');
+          btn.querySelector('.likecount').textContent = await getExactCount('modpack_likes', pack.id);
+        });
         card.querySelector('.installbtn').addEventListener('click', (e)=>{
           e.stopPropagation(); // don't also open the detail modal
           const btn = e.target;

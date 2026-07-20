@@ -85,7 +85,7 @@ async function ensureClientInstalled(versionId, instanceDir, onStatus, signal) {
 
     const objectEntries = Object.values(assetIndexJson.objects);
     const objectsDir = path.join(assetsDir, 'objects');
-    await withConcurrency(objectEntries, 16, async (obj) => {
+    await withConcurrency(objectEntries, 32, async (obj) => {
       const sub = obj.hash.slice(0, 2);
       const dest = path.join(objectsDir, sub, obj.hash);
       await downloadFile(`https://resources.download.minecraft.net/${sub}/${obj.hash}`, dest, signal);
