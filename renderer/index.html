@@ -654,6 +654,15 @@
   }
   .btn-danger-inline:hover{ background:rgba(217,90,90,.2); }
   .modpack-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .packcard{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px; margin-bottom:10px;
+  }
+  .packcard .packtop{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .packcard h4{ font-size:14.5px; }
+  .packcard .packowner{ font-family:'JetBrains Mono'; font-size:11px; color:var(--muted); }
+  .packcard .packmods{ font-size:12px; color:var(--muted); margin-top:6px; }
+  .packcard .installbtn{ margin-top:10px; }
 </style>
 </head>
 <body>
@@ -674,6 +683,10 @@
     <div class="navitem" data-tip="Cosmetics" data-page="cosmetics">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2s-4 3-4 7a4 4 0 008 0c0-4-4-7-4-7z"/><path d="M6 13c0 5 2.5 9 6 9s6-4 6-9"/></svg>
       <span class="tip">Cosmetics</span>
+    </div>
+    <div class="navitem" data-tip="Modpacks" data-page="modpack">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="tip">Modpacks</span>
     </div>
     <div class="navitem disabled" data-tip="Coming soon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 14h16"/><path d="M9 4v6"/></svg>
@@ -698,7 +711,7 @@
       </div>
       <div class="topbar-right">
         <div class="account" id="accountChip">
-          <img class="skinhead" id="skinheadImg" src="https://mc-heads.net/avatar/steve/64" alt="" onerror="this.onerror=null; this.src='https://mc-heads.net/avatar/steve/64';">
+          <img class="skinhead" id="skinheadImg" src="https://minotar.net/avatar/steve/64.png" alt="" onerror="this.onerror=null; this.src='https://minotar.net/avatar/steve/64.png';">
           <span class="uname" id="unameLabel">Sign in with Microsoft</span>
           <span class="caret">▾</span>
         </div>
@@ -857,6 +870,64 @@
             </div>
             <div class="cosmetic-grid" id="cosmeticGrid"></div>
           </div>
+        </div>
+      </div>
+
+      <div id="modpackPage" class="page" data-pageid="modpack">
+        <div class="eyebrow">// modpacks</div>
+        <div class="hero" style="font-size:16px;">MODPACKS</div>
+        <p style="color:var(--muted); font-size:13px; max-width:560px; margin-bottom:20px;">
+          You get one modpack, shared and searchable by anyone else using Lethal Client. Sign in first —
+          your modpack is tied to your real Minecraft account.
+        </p>
+
+        <div class="tabs" id="modpackTabs">
+          <div class="tab active" data-tab="mine">My Modpack</div>
+          <div class="tab" data-tab="browse">Browse Modpacks</div>
+        </div>
+
+        <div id="myModpackTab">
+          <div id="noPackView">
+            <div class="modpack-empty">
+              <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">You haven't created a modpack yet.</p>
+              <div class="addserver-row" style="max-width:360px; margin:0 auto 12px;">
+                <input type="text" id="packNameInput" placeholder="Name your modpack">
+                <button id="createPackBtn">Create</button>
+              </div>
+              <button id="importCurrentModsBtn" class="btn-secondary-inline">Or import your currently-installed mods</button>
+            </div>
+          </div>
+
+          <div id="hasPackView" style="display:none;">
+            <div class="modpack-header">
+              <div>
+                <h3 id="packNameDisplay" style="font-size:16px;"></h3>
+                <div class="serversub" id="packCountDisplay"></div>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button id="importIntoPackBtn" class="btn-secondary-inline">Import installed mods</button>
+                <button id="deletePackBtn" class="btn-danger-inline">Delete modpack</button>
+              </div>
+            </div>
+
+            <div class="modlist" id="packModList" style="margin-bottom:24px;"></div>
+
+            <span class="fieldlabel">Search Modrinth to add mods</span>
+            <div class="addserver-row" style="margin-bottom:14px;">
+              <input type="text" id="modrinthSearchInput" placeholder="Search any mod on Modrinth…">
+              <button id="modrinthSearchBtn">Search</button>
+            </div>
+            <div class="modlist" id="modrinthSearchResults"></div>
+            <div id="packSaveStatus" style="margin-top:10px; font-family:'JetBrains Mono'; font-size:11.5px; color:var(--muted);"></div>
+          </div>
+        </div>
+
+        <div id="browseModpackTab" style="display:none;">
+          <div class="addserver-row" style="margin-bottom:16px;">
+            <input type="text" id="browsePackSearch" placeholder="Search everyone's modpacks by name…">
+            <button id="browsePackSearchBtn">Search</button>
+          </div>
+          <div id="browsePackResults"></div>
         </div>
       </div>
 
@@ -1619,17 +1690,247 @@
     heroUsername.textContent = account.username;
     const cacheBust = Date.now();
 
-    skinheadImg.onerror = () => { skinheadImg.onerror = null; skinheadImg.src = 'https://mc-heads.net/avatar/steve/64'; };
-    skinheadImg.src = `https://mc-heads.net/avatar/${encodeURIComponent(account.username)}/64?t=${cacheBust}`;
+    skinheadImg.onerror = () => { skinheadImg.onerror = null; skinheadImg.src = 'https://minotar.net/avatar/steve/64.png'; };
+    skinheadImg.src = `https://minotar.net/avatar/${encodeURIComponent(account.username)}/64.png?t=${cacheBust}`;
 
     const heroCharacterImg = document.getElementById('heroCharacterImg');
     heroCharacterImg.onerror = () => { heroCharacterImg.onerror = null; heroCharacterImg.src = 'https://minotar.net/armor/body/steve/300.png'; };
     heroCharacterImg.src = `https://minotar.net/armor/body/${encodeURIComponent(account.username)}/300.png?t=${cacheBust}`;
+
+    if(typeof loadMyPack === 'function') loadMyPack();
   }
 
   document.getElementById('winMinimize').addEventListener('click', ()=> window.api.minimizeWindow());
   document.getElementById('winMaximize').addEventListener('click', ()=> window.api.maximizeWindow());
   document.getElementById('winClose').addEventListener('click', ()=> window.api.closeWindow());
+
+  // ---------- Modpacks (real, shared via Supabase) ----------
+  const SUPABASE_URL = 'https://dflkxwmnuqmorlvbjbym.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_Ux757QF3wlqUzUvGkFvzNA_k_lHupDA';
+  const SUPABASE_HEADERS = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+
+  document.getElementById('modpackTabs').addEventListener('click', (e)=>{
+    const tab = e.target.closest('.tab');
+    if(!tab) return;
+    document.querySelectorAll('#modpackTabs .tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const which = tab.getAttribute('data-tab');
+    document.getElementById('myModpackTab').style.display = which === 'mine' ? 'block' : 'none';
+    document.getElementById('browseModpackTab').style.display = which === 'browse' ? 'block' : 'none';
+  });
+
+  let myPack = null; // { id, owner_uuid, owner_username, name, mods: [...] }
+  const noPackView = document.getElementById('noPackView');
+  const hasPackView = document.getElementById('hasPackView');
+  const packSaveStatus = document.getElementById('packSaveStatus');
+
+  function renderPackView(){
+    if(!myPack){
+      noPackView.style.display = 'block';
+      hasPackView.style.display = 'none';
+      return;
+    }
+    noPackView.style.display = 'none';
+    hasPackView.style.display = 'block';
+    document.getElementById('packNameDisplay').textContent = myPack.name;
+    document.getElementById('packCountDisplay').textContent =
+      `${myPack.mods.length} mod${myPack.mods.length === 1 ? '' : 's'} · shared publicly`;
+
+    const listEl = document.getElementById('packModList');
+    listEl.innerHTML = '';
+    myPack.mods.forEach((mod, idx)=>{
+      const row = document.createElement('div');
+      row.className = 'modcard2';
+      row.innerHTML = `
+        <div class="modicon" style="background:${mod.color || '#8b9299'}">${mod.title ? mod.title[0].toUpperCase() : '?'}</div>
+        <div class="modmeta">
+          <div class="toprow"><h4>${mod.title}</h4></div>
+          <div class="subline">by ${mod.author || 'unknown'}</div>
+        </div>
+        <button class="serverremove" title="Remove from pack">×</button>
+      `;
+      row.querySelector('.serverremove').addEventListener('click', async ()=>{
+        myPack.mods.splice(idx, 1);
+        await savePackToSupabase();
+        renderPackView();
+      });
+      listEl.appendChild(row);
+    });
+  }
+
+  async function loadMyPack(){
+    const account = await window.api.getAccount();
+    if(!account) return;
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/modpacks?owner_uuid=eq.${account.uuid}&select=*`, { headers: SUPABASE_HEADERS });
+      const rows = await res.json();
+      myPack = rows[0] || null;
+      renderPackView();
+    }catch(err){
+      console.error('Could not load your modpack', err);
+    }
+  }
+
+  async function savePackToSupabase(){
+    const account = await window.api.getAccount();
+    if(!account){ alert('Sign in with Microsoft first.'); return; }
+    packSaveStatus.textContent = 'Saving…';
+    try{
+      const body = {
+        owner_uuid: account.uuid,
+        owner_username: account.username,
+        name: myPack.name,
+        mods: myPack.mods,
+        updated_at: new Date().toISOString(),
+      };
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/modpacks?on_conflict=owner_uuid`, {
+        method: 'POST',
+        headers: { ...SUPABASE_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify(body),
+      });
+      const rows = await res.json();
+      if(rows[0]) myPack = rows[0];
+      packSaveStatus.textContent = 'Saved — visible to everyone now.';
+    }catch(err){
+      packSaveStatus.textContent = 'Save failed: ' + err.message;
+    }
+  }
+
+  document.getElementById('createPackBtn').addEventListener('click', async ()=>{
+    const name = document.getElementById('packNameInput').value.trim();
+    if(!name) return;
+    const account = await window.api.getAccount();
+    if(!account){ alert('Sign in with Microsoft first.'); return; }
+    myPack = { name, mods: [] };
+    await savePackToSupabase();
+    renderPackView();
+  });
+
+  document.getElementById('importCurrentModsBtn').addEventListener('click', async ()=>{
+    const name = prompt('Name your modpack:');
+    if(!name) return;
+    const account = await window.api.getAccount();
+    if(!account){ alert('Sign in with Microsoft first.'); return; }
+    const installed = modsCatalog.filter(m=>m.installed).map(m=>({
+      id: m.id, title: m.name, author: m.author, color: m.color,
+    }));
+    myPack = { name, mods: installed };
+    await savePackToSupabase();
+    renderPackView();
+  });
+
+  document.getElementById('importIntoPackBtn').addEventListener('click', async ()=>{
+    if(!myPack) return;
+    const existingIds = new Set(myPack.mods.map(m=>m.id).filter(Boolean));
+    modsCatalog.filter(m=>m.installed && !existingIds.has(m.id)).forEach(m=>{
+      myPack.mods.push({ id: m.id, title: m.name, author: m.author, color: m.color });
+    });
+    await savePackToSupabase();
+    renderPackView();
+  });
+
+  document.getElementById('deletePackBtn').addEventListener('click', async ()=>{
+    if(!myPack || !confirm('Delete your modpack? Anyone searching for it will no longer find it.')) return;
+    try{
+      await fetch(`${SUPABASE_URL}/rest/v1/modpacks?id=eq.${myPack.id}`, {
+        method: 'DELETE', headers: SUPABASE_HEADERS,
+      });
+    }catch(err){ console.error(err); }
+    myPack = null;
+    renderPackView();
+  });
+
+  document.getElementById('modrinthSearchBtn').addEventListener('click', async ()=>{
+    const query = document.getElementById('modrinthSearchInput').value.trim();
+    const resultsEl = document.getElementById('modrinthSearchResults');
+    if(!query){ resultsEl.innerHTML = ''; return; }
+    resultsEl.innerHTML = `<div style="color:var(--muted); font-size:12.5px; padding:10px 0;">Searching Modrinth…</div>`;
+    try{
+      const facets = encodeURIComponent('[["project_type:mod"],["categories:fabric"]]');
+      const res = await fetch(`https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&facets=${facets}&limit=12`);
+      const data = await res.json();
+      resultsEl.innerHTML = '';
+      data.hits.forEach(hit=>{
+        const row = document.createElement('div');
+        row.className = 'modcard2';
+        row.innerHTML = `
+          <div class="modicon" style="background-image:url(${hit.icon_url || ''}); background-size:cover; background-color:#8b9299;"></div>
+          <div class="modmeta">
+            <div class="toprow"><h4>${hit.title}</h4></div>
+            <p>${hit.description || ''}</p>
+            <div class="subline">by ${hit.author}</div>
+          </div>
+          <button class="installbtn">Add to pack</button>
+        `;
+        row.querySelector('.installbtn').addEventListener('click', async ()=>{
+          if(!myPack){ alert('Create a modpack first.'); return; }
+          if(myPack.mods.some(m=>m.id === hit.slug)) return;
+          myPack.mods.push({ id: hit.slug, title: hit.title, author: hit.author, color: '#8b9299' });
+          await savePackToSupabase();
+          renderPackView();
+        });
+        resultsEl.appendChild(row);
+      });
+      if(!data.hits.length) resultsEl.innerHTML = `<div style="color:var(--muted); font-size:12.5px; padding:10px 0;">No results.</div>`;
+    }catch(err){
+      resultsEl.innerHTML = `<div style="color:#d95a5a; font-size:12.5px; padding:10px 0;">Search failed: ${err.message}</div>`;
+    }
+  });
+  document.getElementById('modrinthSearchInput').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') document.getElementById('modrinthSearchBtn').click();
+  });
+
+  // ---------- Browse everyone's modpacks ----------
+  async function searchPublicPacks(){
+    const query = document.getElementById('browsePackSearch').value.trim();
+    const resultsEl = document.getElementById('browsePackResults');
+    resultsEl.innerHTML = `<div style="color:var(--muted); font-size:12.5px; padding:10px 0;">Searching…</div>`;
+    try{
+      const filter = query ? `&name=ilike.*${encodeURIComponent(query)}*` : '';
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/modpacks?select=*${filter}&order=updated_at.desc&limit=25`, { headers: SUPABASE_HEADERS });
+      const rows = await res.json();
+      resultsEl.innerHTML = '';
+      if(!rows.length){
+        resultsEl.innerHTML = `<div style="color:var(--muted); font-size:12.5px; padding:10px 0;">No modpacks found.</div>`;
+        return;
+      }
+      rows.forEach(pack=>{
+        const card = document.createElement('div');
+        card.className = 'packcard';
+        card.innerHTML = `
+          <div class="packtop">
+            <h4>${pack.name}</h4>
+            <span class="packowner">by ${pack.owner_username}</span>
+          </div>
+          <div class="packmods">${pack.mods.map(m=>m.title).join(', ') || 'No mods listed'}</div>
+          <button class="installbtn">Install this pack</button>
+        `;
+        card.querySelector('.installbtn').addEventListener('click', async (e)=>{
+          const btn = e.target;
+          btn.disabled = true;
+          btn.textContent = 'Installing…';
+          for(const mod of pack.mods){
+            try{ await window.api.installMod(mod.id, currentVersion); }catch(err){ console.error(err); }
+          }
+          btn.textContent = 'Installed';
+          await syncModsFromManifest();
+        });
+        resultsEl.appendChild(card);
+      });
+    }catch(err){
+      resultsEl.innerHTML = `<div style="color:#d95a5a; font-size:12.5px; padding:10px 0;">Search failed: ${err.message}</div>`;
+    }
+  }
+  document.getElementById('browsePackSearchBtn').addEventListener('click', searchPublicPacks);
+  document.getElementById('browsePackSearch').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') searchPublicPacks();
+  });
+
+  loadMyPack();
 
   // ---------- Skins (real Mojang skin upload) ----------
   document.getElementById('checkUpdatesBtn').addEventListener('click', async ()=>{
