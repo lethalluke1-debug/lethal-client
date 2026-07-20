@@ -283,6 +283,7 @@
   .hero-username-row{ display:flex; align-items:center; justify-content:center; gap:8px; }
   .hero-badge{
     position:relative;
+    z-index:20;
     width:20px; height:20px; border-radius:5px;
     display:flex; align-items:center; justify-content:center;
     cursor:default;
@@ -295,6 +296,7 @@
     padding:4px 9px; font-family:'JetBrains Mono'; font-size:11px; color:var(--text);
     white-space:nowrap; opacity:0; pointer-events:none;
     transition:opacity .12s ease;
+    z-index:20;
   }
   .hero-badge:hover::after{ opacity:1; }
 
