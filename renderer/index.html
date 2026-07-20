@@ -280,6 +280,23 @@
     font-family:'Press Start 2P'; font-size:13px; color:#fff;
     text-shadow:0 2px 6px rgba(0,0,0,.6);
   }
+  .hero-username-row{ display:flex; align-items:center; justify-content:center; gap:8px; }
+  .hero-badge{
+    position:relative;
+    width:20px; height:20px; border-radius:5px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:default;
+  }
+  .hero-badge svg{ width:14px; height:14px; }
+  .hero-badge::after{
+    content:attr(data-tooltip);
+    position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+    background:#000; border:1px solid var(--line); border-radius:6px;
+    padding:4px 9px; font-family:'JetBrains Mono'; font-size:11px; color:var(--text);
+    white-space:nowrap; opacity:0; pointer-events:none;
+    transition:opacity .12s ease;
+  }
+  .hero-badge:hover::after{ opacity:1; }
 
   .hero-actions{ display:flex; align-items:center; justify-content:center; margin-top:4px; }
   .hero-playbtn{
@@ -790,7 +807,10 @@
               <img id="heroCharacterImg" src="https://minotar.net/armor/body/steve/300.png" alt="" onerror="this.onerror=null; this.src='https://minotar.net/armor/body/steve/300.png';">
               <div class="hero-pedestal"></div>
             </div>
-            <div class="hero-username" id="heroUsername">Sign in to play</div>
+            <div class="hero-username-row">
+              <div class="hero-username" id="heroUsername">Sign in to play</div>
+              <span class="hero-badge" id="heroBadge" style="display:none;"></span>
+            </div>
 
             <div class="hero-actions">
               <button id="heroPlayBtn" class="hero-playbtn">
@@ -1838,6 +1858,38 @@
     heroCharacterImg.src = `https://minotar.net/armor/body/${encodeURIComponent(account.username)}/300.png?t=${cacheBust}`;
 
     if(typeof loadMyPack === 'function') loadMyPack();
+    if(typeof checkAndShowBadge === 'function') checkAndShowBadge(account.username);
+  }
+
+  const BADGE_ICONS = {
+    youtube: {
+      tooltip: 'YouTube Creator',
+      bg: '#d95a5a',
+      svg: '<svg viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>',
+    },
+    twitch: {
+      tooltip: 'Twitch Streamer',
+      bg: '#7c5cb3',
+      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M4 4h16v11l-4 4h-4l-3 3v-3H4z"/><path d="M13 8v4M17 8v4"/></svg>',
+    },
+  };
+
+  async function checkAndShowBadge(username){
+    const badgeEl = document.getElementById('heroBadge');
+    badgeEl.style.display = 'none';
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/badges?username=ilike.${encodeURIComponent(username)}&select=badge_type`, { headers: SUPABASE_HEADERS });
+      const rows = await res.json();
+      if(!rows.length) return;
+      const info = BADGE_ICONS[rows[0].badge_type];
+      if(!info) return;
+      badgeEl.style.background = info.bg;
+      badgeEl.innerHTML = info.svg;
+      badgeEl.setAttribute('data-tooltip', info.tooltip);
+      badgeEl.style.display = 'flex';
+    }catch(err){
+      console.error('Could not check badge', err);
+    }
   }
 
   document.getElementById('winMinimize').addEventListener('click', ()=> window.api.minimizeWindow());
