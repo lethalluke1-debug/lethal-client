@@ -1650,6 +1650,21 @@
     localStorage.setItem(SELECTED_PACKS_KEY, JSON.stringify(packs));
   }
 
+  /** Selecting a pack for play should immediately switch the right-hand Play
+   * panel to Modpack mode with that exact pack already chosen — not leave
+   * you to go flip the mode and reopen the dropdown yourself. */
+  function switchToModpackMode(pack){
+    playMode = 'modpack';
+    document.querySelectorAll('.modebtn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('.modebtn[data-mode="modpack"]').classList.add('active');
+    document.getElementById('modpackPicker').style.display = 'block';
+    refreshModpackDropdown();
+    chosenModpack = pack;
+    const label = pack.name + (myPack && pack.id === myPack.id ? ' (yours)' : '');
+    document.getElementById('modpackPickerLabel').textContent = label;
+    document.getElementById('modpackModeSubline').textContent = pack.name;
+  }
+
   function refreshModpackDropdown(){
     const listEl = document.getElementById('modpackPickerList');
     listEl.innerHTML = '';
@@ -2008,7 +2023,7 @@
     selectBtn.onclick = ()=>{
       const nowSelected = getSelectedPacks().some(p=>p.id === pack.id);
       if(nowSelected){ removeSelectedPack(pack.id); }
-      else{ addSelectedPack(pack); }
+      else{ addSelectedPack(pack); switchToModpackMode(pack); }
       refreshModpackDropdown();
       openPackDetailModal(pack); // refresh button state in place
       searchPublicPacks(); // refresh card button states in the list behind it
@@ -2057,6 +2072,7 @@
             btn.classList.remove('installed');
           } else {
             addSelectedPack(pack);
+            switchToModpackMode(pack);
             btn.textContent = 'Selected for Play';
             btn.classList.add('installed');
           }
