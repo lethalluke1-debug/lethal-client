@@ -1674,20 +1674,49 @@
 
     if(!options.length){
       listEl.innerHTML = `<div class="selectitem" style="color:var(--muted); cursor:default;">No modpacks yet — create one or select one from Browse Modpacks</div>`;
-      return;
-    }
-    options.forEach(pack=>{
-      const item = document.createElement('div');
-      item.className = 'selectitem';
-      item.textContent = pack._label;
-      item.addEventListener('click', ()=>{
-        chosenModpack = pack;
-        document.getElementById('modpackPickerLabel').textContent = pack._label;
-        document.getElementById('modpackPickerList').classList.remove('open');
-        document.getElementById('modpackModeSubline').textContent = pack.name;
+    } else {
+      options.forEach(pack=>{
+        const item = document.createElement('div');
+        item.className = 'selectitem';
+        item.textContent = pack._label;
+        item.addEventListener('click', ()=>{
+          chosenModpack = pack;
+          document.getElementById('modpackPickerLabel').textContent = pack._label;
+          document.getElementById('modpackPickerList').classList.remove('open');
+          document.getElementById('modpackModeSubline').textContent = pack.name;
+        });
+        listEl.appendChild(item);
       });
-      listEl.appendChild(item);
-    });
+    }
+
+    prunedDeletedSelectedPacks(); // check in the background for any that no longer really exist
+  }
+
+  /** Someone else's pack you selected might get deleted by its actual owner
+   * later — this quietly checks Supabase and drops anything that's gone,
+   * instead of leaving a stale local copy sitting in the dropdown forever. */
+  async function prunedDeletedSelectedPacks(){
+    const selected = getSelectedPacks();
+    if(!selected.length) return;
+    try{
+      const ids = selected.map(p=>`"${p.id}"`).join(',');
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/modpacks?id=in.(${ids})&select=id`, { headers: SUPABASE_HEADERS });
+      const stillExist = new Set((await res.json()).map(r=>r.id));
+      const stale = selected.filter(p=> !stillExist.has(p.id));
+      if(!stale.length) return;
+
+      stale.forEach(p=>{
+        removeSelectedPack(p.id);
+        if(chosenModpack && chosenModpack.id === p.id){
+          chosenModpack = null;
+          document.getElementById('modpackPickerLabel').textContent = 'Choose a modpack…';
+          document.getElementById('modpackModeSubline').textContent = 'Pick a pack below';
+        }
+      });
+      refreshModpackDropdown(); // re-render now that stale ones are gone (won't loop — nothing stale left this time)
+    }catch(err){
+      console.error('Could not check selected modpacks for deletion', err);
+    }
   }
 
   document.getElementById('modpackPickerSelect').addEventListener('click', (e)=>{
@@ -1946,12 +1975,20 @@
 
   document.getElementById('deletePackBtn').addEventListener('click', async ()=>{
     if(!myPack || !confirm('Delete your modpack? Anyone searching for it will no longer find it.')) return;
+    const deletedId = myPack.id;
     try{
-      await fetch(`${SUPABASE_URL}/rest/v1/modpacks?id=eq.${myPack.id}`, {
+      await fetch(`${SUPABASE_URL}/rest/v1/modpacks?id=eq.${deletedId}`, {
         method: 'DELETE', headers: SUPABASE_HEADERS,
       });
     }catch(err){ console.error(err); }
     myPack = null;
+    removeSelectedPack(deletedId); // in case you'd also selected your own pack for play
+    if(chosenModpack && chosenModpack.id === deletedId){
+      chosenModpack = null;
+      document.getElementById('modpackPickerLabel').textContent = 'Choose a modpack…';
+      document.getElementById('modpackModeSubline').textContent = 'Pick a pack below';
+    }
+    refreshModpackDropdown();
     renderPackView();
   });
 
