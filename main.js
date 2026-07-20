@@ -225,6 +225,8 @@ ipcMain.handle('get-account', () => {
   return account ? { username: account.username, uuid: account.uuid } : null;
 });
 
+ipcMain.handle('get-app-version', () => app.getVersion());
+
 // ---------- Mods (Modrinth) ----------
 ipcMain.handle('install-mod', async (event, { modId, version }) => {
   const modsDir = path.join(gameDirFor(version), 'mods');

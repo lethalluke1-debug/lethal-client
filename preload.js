@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('api', {
   onStatus: (callback) => ipcRenderer.on('status-update', (event, msg) => callback(msg)),
   onLoginWaiting: (callback) => ipcRenderer.on('ms-login-waiting', () => callback()),
   onAccountRestored: (callback) => ipcRenderer.on('account-restored', (event, account) => callback(account)),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   onUpdateReady: (callback) => ipcRenderer.on('update-ready', () => callback()),
   restartToUpdate: () => ipcRenderer.send('restart-to-update'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),

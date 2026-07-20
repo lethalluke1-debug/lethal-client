@@ -708,6 +708,7 @@
       <div class="titlecluster">
         <span class="name" style="font-size:10px;">LETHAL CLIENT</span>
         <span class="ver">Fabric · Java Edition</span>
+        <span class="ver" id="appVersionTag">v?</span>
       </div>
       <div class="topbar-right">
         <div class="account" id="accountChip">
@@ -1931,6 +1932,10 @@
   });
 
   loadMyPack();
+
+  window.api.getAppVersion().then(v=>{
+    document.getElementById('appVersionTag').textContent = 'v' + v;
+  });
 
   // ---------- Skins (real Mojang skin upload) ----------
   document.getElementById('checkUpdatesBtn').addEventListener('click', async ()=>{
